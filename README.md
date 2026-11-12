@@ -23,6 +23,8 @@ Agents forget everything when a session ends. This library gives them durable me
 - [Vector search](#vector-search)
 - [Consistency](#consistency)
 - [Extending](#extending)
+- [Examples](#examples)
+- [Validation](#validation)
 - [License](#license)
 
 ## Install
@@ -173,6 +175,35 @@ Everything is an interface. If something doesn't fit, replace it.
 - **Embedder** — `vector.Embedder`
 - **Vector store** — `vector.Store`
 - **Similarity** — `vector.Similarity`
+
+## Examples
+
+| Example | Demonstrates |
+|---------|--------------|
+| [Basic memory](examples/01-basic) | Entry lifecycle, source and metadata, scoped listing, and BM25 recall |
+| [SQLite](examples/02-sqlite) | Caller-owned database, persistence across reopening, scoped reads, and deletion |
+| [Hybrid search](examples/03-hybrid) | Ollama embeddings, keyword and vector indexes, and RRF merging |
+
+Examples use temporary storage. Hybrid search requires local Ollama with `qwen3-embedding:0.6b` installed.
+
+```sh
+go run ./examples/01-basic
+go run ./examples/02-sqlite
+go run ./examples/03-hybrid
+```
+
+## Validation
+
+Consumer validation checks persistence, version conflicts, recall, and deletion with JSON and SQLite. Retrieval evaluation measures quality and latency across 100 entries and 40 labeled queries.
+
+```sh
+go run ./eval/consumer
+go run ./eval/retrieval
+go test -race ./...
+golangci-lint run
+```
+
+See the [retrieval evaluation notes](eval/retrieval/README.md) for model configuration, metrics, and recorded results.
 
 ## License
 

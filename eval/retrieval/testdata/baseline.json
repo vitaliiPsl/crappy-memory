@@ -1,0 +1,1479 @@
+{
+  "dataset_sha256": "a26428363c9bf5d6f99402dae6ddf100f00103910641ad4d44a2131ff07dddfc",
+  "entries": 100,
+  "queries": 40,
+  "k": 3,
+  "runs": 3,
+  "model": "qwen3-embedding:0.6b",
+  "query_prefix": "Instruct: Retrieve a saved memory that answers the question.\nQuery: ",
+  "evaluations": [
+    {
+      "mode": "bm25",
+      "recall": 0.7958333333333333,
+      "precision": 0.3333333333333334,
+      "mrr": 0.7791666666666667,
+      "mean_latency_ns": 37341,
+      "p95_latency_ns": 73042,
+      "queries": [
+        {
+          "id": "exact-keyword",
+          "retrieved": [
+            "atlas-search",
+            "atlas-sql-backups",
+            "atlas-compaction-command"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 18694
+        },
+        {
+          "id": "filename",
+          "retrieved": [
+            "atlas-instructions"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 1930
+        },
+        {
+          "id": "test-preference",
+          "retrieved": [
+            "test-style",
+            "test-property",
+            "editor-indent"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 13388
+        },
+        {
+          "id": "reply-paraphrase",
+          "retrieved": [
+            "communication-language",
+            "reply-format",
+            "test-integration"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 3986
+        },
+        {
+          "id": "reminder-time",
+          "retrieved": [
+            "spelling",
+            "test-integration",
+            "timezone"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.3333333333333333,
+          "mean_latency_ns": 13138
+        },
+        {
+          "id": "connection-ownership",
+          "retrieved": [
+            "atlas-database",
+            "atlas-sql-driver",
+            "atlas-config-profile"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 43722
+        },
+        {
+          "id": "interruption-paraphrase",
+          "retrieved": [
+            "atlas-api-session-interrupted",
+            "atlas-embeddings",
+            "atlas-shutdown"
+          ],
+          "recall": 0.3333333333333333,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 42152
+        },
+        {
+          "id": "cancel-behavior",
+          "retrieved": [
+            "atlas-cancel",
+            "atlas-request-context",
+            "atlas-resume-command"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 46389
+        },
+        {
+          "id": "deployment-scope",
+          "retrieved": [
+            "atlas-deploy",
+            "atlas-release-production",
+            "atlas-deploy-legacy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 45375
+        },
+        {
+          "id": "deployment-preparation",
+          "retrieved": [
+            "atlas-deploy",
+            "atlas-release-production",
+            "atlas-migrations"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 68000
+        },
+        {
+          "id": "embedding-prefixes",
+          "retrieved": [
+            "atlas-embeddings",
+            "atlas-search-empty",
+            "atlas-compaction-trigger"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 22708
+        },
+        {
+          "id": "recover-index",
+          "retrieved": [
+            "atlas-rebuild",
+            "atlas-search",
+            "atlas-search-budget"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 25750
+        },
+        {
+          "id": "canonical-authority",
+          "retrieved": [
+            "atlas-rebuild",
+            "atlas-canonical",
+            "atlas-memory-delete"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 19110
+        },
+        {
+          "id": "multiple-scopes",
+          "retrieved": [
+            "atlas-tests",
+            "test-style",
+            "test-integration"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 61667
+        },
+        {
+          "id": "allergy",
+          "retrieved": [
+            "food-allergy",
+            "progress-updates",
+            "food-preference"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 11416
+        },
+        {
+          "id": "quiet-hours",
+          "retrieved": [
+            "quiet-hours",
+            "progress-updates",
+            "food-allergy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 5652
+        },
+        {
+          "id": "indentation",
+          "retrieved": [
+            "editor-indent",
+            "test-integration",
+            "code-format"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 22403
+        },
+        {
+          "id": "deletion-approval",
+          "retrieved": [
+            "test-integration",
+            "review-order",
+            "test-property"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 14624
+        },
+        {
+          "id": "integration-tests",
+          "retrieved": [
+            "test-integration",
+            "code-format",
+            "reply-format"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 8833
+        },
+        {
+          "id": "code-snippets",
+          "retrieved": [
+            "reply-format",
+            "code-format",
+            "food-allergy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.5,
+          "mean_latency_ns": 22458
+        },
+        {
+          "id": "configuration-path",
+          "retrieved": [
+            "atlas-config-env",
+            "atlas-config-profile",
+            "atlas-hybrid-rrf"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 50069
+        },
+        {
+          "id": "history-versus-memory",
+          "retrieved": [
+            "atlas-session-dir",
+            "atlas-memory-consolidation",
+            "atlas-memory-path"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 83597
+        },
+        {
+          "id": "relative-file-paths",
+          "retrieved": [
+            "atlas-files-paths",
+            "atlas-session-workdir",
+            "atlas-bash-directory"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 73180
+        },
+        {
+          "id": "bash-directory",
+          "retrieved": [
+            "atlas-bash-directory",
+            "atlas-deploy",
+            "atlas-shutdown"
+          ],
+          "recall": 0.5,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 82861
+        },
+        {
+          "id": "environment-refresh",
+          "retrieved": [
+            "atlas-api-session-readonly",
+            "atlas-sql-wal",
+            "atlas-sql-backups"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 47583
+        },
+        {
+          "id": "queue-order",
+          "retrieved": [
+            "atlas-queue-order",
+            "atlas-shutdown",
+            "atlas-deploy-legacy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 44653
+        },
+        {
+          "id": "cancel-waiting",
+          "retrieved": [
+            "atlas-cancel-request",
+            "atlas-request-context",
+            "atlas-cancel"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 46263
+        },
+        {
+          "id": "shutdown",
+          "retrieved": [
+            "atlas-cancel-request",
+            "atlas-api-session-readonly",
+            "atlas-memory-delete"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 35236
+        },
+        {
+          "id": "compaction-history",
+          "retrieved": [
+            "atlas-output-cap",
+            "atlas-shutdown",
+            "atlas-api-request-timeout"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 43125
+        },
+        {
+          "id": "compaction-memory",
+          "retrieved": [
+            "atlas-sql-readonly",
+            "atlas-embedding-endpoint",
+            "atlas-memory-delete"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 40458
+        },
+        {
+          "id": "memory-conflict",
+          "retrieved": [
+            "atlas-memory-conflict",
+            "atlas-sql-readonly",
+            "atlas-search-empty"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 59472
+        },
+        {
+          "id": "embedding-reuse",
+          "retrieved": [
+            "atlas-memory-delete",
+            "atlas-embeddings",
+            "atlas-deploy-legacy"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 42486
+        },
+        {
+          "id": "orphaned-vectors",
+          "retrieved": [
+            "atlas-index-reconcile",
+            "atlas-canonical",
+            "atlas-cancel"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 37472
+        },
+        {
+          "id": "embedding-endpoint",
+          "retrieved": [
+            "atlas-embedding-endpoint",
+            "atlas-credential-store",
+            "atlas-memory-consolidation"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 11694
+        },
+        {
+          "id": "rank-fusion",
+          "retrieved": [
+            "atlas-hybrid-rrf",
+            "atlas-search-empty",
+            "atlas-vector-search"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 31708
+        },
+        {
+          "id": "candidate-budget",
+          "retrieved": [
+            "atlas-search-budget",
+            "atlas-search-empty",
+            "atlas-cancel-request"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 41625
+        },
+        {
+          "id": "readonly-error",
+          "retrieved": [
+            "atlas-api-session-readonly",
+            "atlas-api-session-interrupted",
+            "atlas-cancel-request"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 46416
+        },
+        {
+          "id": "interrupted-error",
+          "retrieved": [
+            "atlas-api-session-interrupted",
+            "atlas-api-request-timeout",
+            "atlas-api-session-readonly"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 19153
+        },
+        {
+          "id": "retired-deploy-command",
+          "retrieved": [
+            "atlas-deploy-legacy",
+            "atlas-deploy",
+            "atlas-release-production"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 50750
+        },
+        {
+          "id": "global-project-command",
+          "retrieved": [
+            "atlas-deploy",
+            "beacon-release",
+            "beacon-deploy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.3333333333333333,
+          "mean_latency_ns": 94444
+        }
+      ]
+    },
+    {
+      "mode": "vector",
+      "recall": 0.9416666666666668,
+      "precision": 0.3916666666666667,
+      "mrr": 0.8791666666666668,
+      "mean_latency_ns": 27574733,
+      "p95_latency_ns": 29377750,
+      "queries": [
+        {
+          "id": "exact-keyword",
+          "retrieved": [
+            "atlas-search",
+            "atlas-search-empty",
+            "atlas-search-budget"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28216792
+        },
+        {
+          "id": "filename",
+          "retrieved": [
+            "atlas-instructions",
+            "atlas-memory-path",
+            "atlas-search"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 17013680
+        },
+        {
+          "id": "test-preference",
+          "retrieved": [
+            "test-style",
+            "test-naming",
+            "test-property"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27543986
+        },
+        {
+          "id": "reply-paraphrase",
+          "retrieved": [
+            "communication-language",
+            "progress-updates",
+            "reply-style"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.3333333333333333,
+          "mean_latency_ns": 17931652
+        },
+        {
+          "id": "reminder-time",
+          "retrieved": [
+            "timezone",
+            "quiet-hours",
+            "calendar-travel"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27668680
+        },
+        {
+          "id": "connection-ownership",
+          "retrieved": [
+            "atlas-database",
+            "atlas-sql-driver",
+            "atlas-sql-readonly"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27889597
+        },
+        {
+          "id": "interruption-paraphrase",
+          "retrieved": [
+            "atlas-memory-consolidation",
+            "atlas-resume",
+            "atlas-api-session-interrupted"
+          ],
+          "recall": 0.6666666666666666,
+          "precision": 0.6666666666666666,
+          "reciprocal": 0.5,
+          "mean_latency_ns": 28862264
+        },
+        {
+          "id": "cancel-behavior",
+          "retrieved": [
+            "atlas-cancel",
+            "atlas-cancel-request",
+            "atlas-resume"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27952666
+        },
+        {
+          "id": "deployment-scope",
+          "retrieved": [
+            "atlas-deploy",
+            "atlas-deploy-legacy",
+            "atlas-release-production"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27356722
+        },
+        {
+          "id": "deployment-preparation",
+          "retrieved": [
+            "atlas-deploy",
+            "atlas-migrations",
+            "atlas-deploy-legacy"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 27695805
+        },
+        {
+          "id": "embedding-prefixes",
+          "retrieved": [
+            "atlas-embeddings",
+            "atlas-search-empty",
+            "atlas-canonical"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27149791
+        },
+        {
+          "id": "recover-index",
+          "retrieved": [
+            "atlas-rebuild",
+            "atlas-memory-delete",
+            "atlas-search-budget"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28954013
+        },
+        {
+          "id": "canonical-authority",
+          "retrieved": [
+            "atlas-rebuild",
+            "atlas-canonical",
+            "atlas-index-reconcile"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 27714013
+        },
+        {
+          "id": "multiple-scopes",
+          "retrieved": [
+            "atlas-tests",
+            "test-style",
+            "test-naming"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 28891180
+        },
+        {
+          "id": "allergy",
+          "retrieved": [
+            "food-allergy",
+            "food-preference",
+            "coffee"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27298194
+        },
+        {
+          "id": "quiet-hours",
+          "retrieved": [
+            "quiet-hours",
+            "calendar-travel",
+            "notifications"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 26907014
+        },
+        {
+          "id": "indentation",
+          "retrieved": [
+            "editor-indent",
+            "editor-linewidth",
+            "test-style"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27908652
+        },
+        {
+          "id": "deletion-approval",
+          "retrieved": [
+            "command-approval",
+            "privacy",
+            "review-order"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27952819
+        },
+        {
+          "id": "integration-tests",
+          "retrieved": [
+            "test-integration",
+            "test-naming",
+            "test-property"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27534042
+        },
+        {
+          "id": "code-snippets",
+          "retrieved": [
+            "code-format",
+            "editor-linewidth",
+            "math-explanations"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27472527
+        },
+        {
+          "id": "configuration-path",
+          "retrieved": [
+            "atlas-config-profile",
+            "atlas-config-env",
+            "atlas-files-paths"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 28598319
+        },
+        {
+          "id": "history-versus-memory",
+          "retrieved": [
+            "atlas-session-dir",
+            "atlas-memory-path",
+            "atlas-memory-consolidation"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 28838278
+        },
+        {
+          "id": "relative-file-paths",
+          "retrieved": [
+            "atlas-files-paths",
+            "atlas-session-workdir",
+            "atlas-config-env"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 29515014
+        },
+        {
+          "id": "bash-directory",
+          "retrieved": [
+            "atlas-bash-directory",
+            "atlas-session-workdir",
+            "atlas-files-paths"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 29266736
+        },
+        {
+          "id": "environment-refresh",
+          "retrieved": [
+            "atlas-memory-consolidation",
+            "atlas-memory-path",
+            "atlas-output-cap"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 27265764
+        },
+        {
+          "id": "queue-order",
+          "retrieved": [
+            "atlas-queue-order",
+            "atlas-resume",
+            "atlas-cancel"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28393708
+        },
+        {
+          "id": "cancel-waiting",
+          "retrieved": [
+            "atlas-cancel-request",
+            "atlas-cancel",
+            "atlas-resume"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28238778
+        },
+        {
+          "id": "shutdown",
+          "retrieved": [
+            "atlas-resume",
+            "atlas-api-session-interrupted",
+            "atlas-shutdown"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.3333333333333333,
+          "mean_latency_ns": 27339416
+        },
+        {
+          "id": "compaction-history",
+          "retrieved": [
+            "atlas-memory-consolidation",
+            "atlas-compaction-summary",
+            "atlas-compaction-trigger"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.5,
+          "mean_latency_ns": 29136680
+        },
+        {
+          "id": "compaction-memory",
+          "retrieved": [
+            "atlas-memory-consolidation",
+            "atlas-compaction-command",
+            "atlas-session-dir"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.5,
+          "mean_latency_ns": 27097000
+        },
+        {
+          "id": "memory-conflict",
+          "retrieved": [
+            "atlas-memory-conflict",
+            "atlas-index-vector",
+            "atlas-memory-consolidation"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28088111
+        },
+        {
+          "id": "embedding-reuse",
+          "retrieved": [
+            "atlas-index-vector",
+            "atlas-memory-consolidation",
+            "atlas-embedding-model"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27300028
+        },
+        {
+          "id": "orphaned-vectors",
+          "retrieved": [
+            "atlas-memory-consolidation",
+            "atlas-memory-delete",
+            "atlas-rebuild"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 27718763
+        },
+        {
+          "id": "embedding-endpoint",
+          "retrieved": [
+            "atlas-embedding-endpoint",
+            "atlas-embedding-model",
+            "atlas-output-cap"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28101930
+        },
+        {
+          "id": "rank-fusion",
+          "retrieved": [
+            "atlas-hybrid-rrf",
+            "atlas-vector-search",
+            "atlas-search-empty"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28792208
+        },
+        {
+          "id": "candidate-budget",
+          "retrieved": [
+            "atlas-search-budget",
+            "atlas-search-empty",
+            "atlas-search"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27176653
+        },
+        {
+          "id": "readonly-error",
+          "retrieved": [
+            "atlas-api-session-readonly",
+            "atlas-sql-readonly",
+            "atlas-session-dir"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 32482555
+        },
+        {
+          "id": "interrupted-error",
+          "retrieved": [
+            "atlas-api-session-interrupted",
+            "atlas-resume",
+            "atlas-api-session-readonly"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28357458
+        },
+        {
+          "id": "retired-deploy-command",
+          "retrieved": [
+            "atlas-deploy-legacy",
+            "atlas-deploy",
+            "atlas-release-production"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 26940111
+        },
+        {
+          "id": "global-project-command",
+          "retrieved": [
+            "beacon-deploy",
+            "beacon-release",
+            "atlas-child-deploy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28427708
+        }
+      ]
+    },
+    {
+      "mode": "hybrid",
+      "recall": 0.8666666666666668,
+      "precision": 0.3666666666666668,
+      "mrr": 0.85,
+      "mean_latency_ns": 30187842,
+      "p95_latency_ns": 41478083,
+      "queries": [
+        {
+          "id": "exact-keyword",
+          "retrieved": [
+            "atlas-search",
+            "atlas-hybrid-rrf",
+            "atlas-search-empty"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28052389
+        },
+        {
+          "id": "filename",
+          "retrieved": [
+            "atlas-instructions",
+            "atlas-memory-path",
+            "atlas-search"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 16806889
+        },
+        {
+          "id": "test-preference",
+          "retrieved": [
+            "test-style",
+            "test-property",
+            "editor-indent"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28872763
+        },
+        {
+          "id": "reply-paraphrase",
+          "retrieved": [
+            "communication-language",
+            "reply-format",
+            "test-integration"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 18318222
+        },
+        {
+          "id": "reminder-time",
+          "retrieved": [
+            "timezone",
+            "quiet-hours",
+            "spelling"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27663930
+        },
+        {
+          "id": "connection-ownership",
+          "retrieved": [
+            "atlas-database",
+            "atlas-sql-driver",
+            "atlas-cancel-request"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28341361
+        },
+        {
+          "id": "interruption-paraphrase",
+          "retrieved": [
+            "atlas-api-session-interrupted",
+            "atlas-shutdown",
+            "atlas-resume-command"
+          ],
+          "recall": 0.6666666666666666,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 29860486
+        },
+        {
+          "id": "cancel-behavior",
+          "retrieved": [
+            "atlas-cancel",
+            "atlas-queue-order",
+            "atlas-resume-command"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28409139
+        },
+        {
+          "id": "deployment-scope",
+          "retrieved": [
+            "atlas-deploy",
+            "atlas-deploy-legacy",
+            "atlas-release-production"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 28013333
+        },
+        {
+          "id": "deployment-preparation",
+          "retrieved": [
+            "atlas-deploy",
+            "atlas-migrations",
+            "atlas-release-production"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 28139180
+        },
+        {
+          "id": "embedding-prefixes",
+          "retrieved": [
+            "atlas-embeddings",
+            "atlas-search-empty",
+            "atlas-canonical"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27448639
+        },
+        {
+          "id": "recover-index",
+          "retrieved": [
+            "atlas-rebuild",
+            "atlas-search-budget",
+            "atlas-search"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 29158208
+        },
+        {
+          "id": "canonical-authority",
+          "retrieved": [
+            "atlas-rebuild",
+            "atlas-canonical",
+            "atlas-memory-delete"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 27416764
+        },
+        {
+          "id": "multiple-scopes",
+          "retrieved": [
+            "atlas-tests",
+            "test-style",
+            "test-naming"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 29720152
+        },
+        {
+          "id": "allergy",
+          "retrieved": [
+            "food-allergy",
+            "food-preference",
+            "coffee"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27770277
+        },
+        {
+          "id": "quiet-hours",
+          "retrieved": [
+            "quiet-hours",
+            "progress-updates",
+            "food-allergy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27445972
+        },
+        {
+          "id": "indentation",
+          "retrieved": [
+            "editor-indent",
+            "test-style",
+            "code-format"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 27870042
+        },
+        {
+          "id": "deletion-approval",
+          "retrieved": [
+            "review-order",
+            "test-integration",
+            "reply-style"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 27502055
+        },
+        {
+          "id": "integration-tests",
+          "retrieved": [
+            "test-integration",
+            "test-naming",
+            "test-style"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 26908569
+        },
+        {
+          "id": "code-snippets",
+          "retrieved": [
+            "code-format",
+            "reply-format",
+            "editor-linewidth"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 26850972
+        },
+        {
+          "id": "configuration-path",
+          "retrieved": [
+            "atlas-config-profile",
+            "atlas-config-env",
+            "atlas-files-paths"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 28527347
+        },
+        {
+          "id": "history-versus-memory",
+          "retrieved": [
+            "atlas-session-dir",
+            "atlas-memory-path",
+            "atlas-memory-consolidation"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 31635499
+        },
+        {
+          "id": "relative-file-paths",
+          "retrieved": [
+            "atlas-files-paths",
+            "atlas-session-workdir",
+            "atlas-bash-directory"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 29452042
+        },
+        {
+          "id": "bash-directory",
+          "retrieved": [
+            "atlas-bash-directory",
+            "atlas-files-paths",
+            "atlas-request-context"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 30870639
+        },
+        {
+          "id": "environment-refresh",
+          "retrieved": [
+            "atlas-api-session-readonly",
+            "atlas-memory-path",
+            "atlas-search-empty"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 28201569
+        },
+        {
+          "id": "queue-order",
+          "retrieved": [
+            "atlas-queue-order",
+            "atlas-resume",
+            "atlas-shutdown"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 29380666
+        },
+        {
+          "id": "cancel-waiting",
+          "retrieved": [
+            "atlas-cancel-request",
+            "atlas-cancel",
+            "atlas-api-session-interrupted"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 29738333
+        },
+        {
+          "id": "shutdown",
+          "retrieved": [
+            "atlas-cancel-request",
+            "atlas-queue-order",
+            "atlas-api-session-readonly"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 27601167
+        },
+        {
+          "id": "compaction-history",
+          "retrieved": [
+            "atlas-output-cap",
+            "atlas-compaction-summary",
+            "atlas-shutdown"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.5,
+          "mean_latency_ns": 30081347
+        },
+        {
+          "id": "compaction-memory",
+          "retrieved": [
+            "atlas-memory-delete",
+            "atlas-session-dir",
+            "atlas-search-empty"
+          ],
+          "recall": 0,
+          "precision": 0,
+          "reciprocal": 0,
+          "mean_latency_ns": 28984694
+        },
+        {
+          "id": "memory-conflict",
+          "retrieved": [
+            "atlas-memory-conflict",
+            "atlas-index-vector",
+            "atlas-api-session-readonly"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 39948291
+        },
+        {
+          "id": "embedding-reuse",
+          "retrieved": [
+            "atlas-index-vector",
+            "atlas-embedding-model",
+            "atlas-memory-delete"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 34717444
+        },
+        {
+          "id": "orphaned-vectors",
+          "retrieved": [
+            "atlas-canonical",
+            "atlas-index-reconcile",
+            "atlas-sql-backups"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 0.5,
+          "mean_latency_ns": 65747319
+        },
+        {
+          "id": "embedding-endpoint",
+          "retrieved": [
+            "atlas-embedding-endpoint",
+            "atlas-memory-path",
+            "atlas-memory-consolidation"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 38668472
+        },
+        {
+          "id": "rank-fusion",
+          "retrieved": [
+            "atlas-hybrid-rrf",
+            "atlas-vector-search",
+            "atlas-search-empty"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 33246208
+        },
+        {
+          "id": "candidate-budget",
+          "retrieved": [
+            "atlas-search-budget",
+            "atlas-search-empty",
+            "atlas-compaction-summary"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 32997930
+        },
+        {
+          "id": "readonly-error",
+          "retrieved": [
+            "atlas-api-session-readonly",
+            "atlas-api-session-interrupted",
+            "atlas-sql-readonly"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 31157250
+        },
+        {
+          "id": "interrupted-error",
+          "retrieved": [
+            "atlas-api-session-interrupted",
+            "atlas-api-request-timeout",
+            "atlas-api-session-readonly"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 31651069
+        },
+        {
+          "id": "retired-deploy-command",
+          "retrieved": [
+            "atlas-deploy-legacy",
+            "atlas-deploy",
+            "atlas-release-production"
+          ],
+          "recall": 1,
+          "precision": 0.6666666666666666,
+          "reciprocal": 1,
+          "mean_latency_ns": 34087875
+        },
+        {
+          "id": "global-project-command",
+          "retrieved": [
+            "beacon-deploy",
+            "beacon-release",
+            "atlas-deploy"
+          ],
+          "recall": 1,
+          "precision": 0.3333333333333333,
+          "reciprocal": 1,
+          "mean_latency_ns": 30249194
+        }
+      ]
+    }
+  ]
+}
