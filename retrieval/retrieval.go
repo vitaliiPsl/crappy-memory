@@ -1,25 +1,30 @@
-package memory
+package retrieval
 
 import (
 	"context"
-	"errors"
 	"slices"
 )
 
 const DefaultSearchLimit = 10
 
-var ErrPipelineRequired = errors.New("memory search requires a pipeline")
+type Item struct {
+	ID      string `json:"id"`
+	Scope   string `json:"scope"`
+	Version uint64 `json:"version"`
+	Text    string `json:"text"`
+}
+
+type Indexer interface {
+	Upsert(ctx context.Context, item Item) error
+	Remove(ctx context.Context, id string) error
+}
 
 type Retriever interface {
 	Retrieve(ctx context.Context, query Query) ([]Candidate, error)
 }
 
-type Pipeline interface {
-	Search(ctx context.Context, query Query) ([]SearchResult, error)
-}
-
 type Merger interface {
-	Merge(ctx context.Context, lists [][]SearchResult) ([]SearchResult, error)
+	Merge(ctx context.Context, lists [][]Candidate) ([]Candidate, error)
 }
 
 type QueryOption func(*Query)
@@ -71,9 +76,4 @@ type Candidate struct {
 	ID      string  `json:"id"`
 	Version uint64  `json:"version,omitempty"`
 	Score   float64 `json:"score"`
-}
-
-type SearchResult struct {
-	Entry Entry   `json:"entry"`
-	Score float64 `json:"score"`
 }

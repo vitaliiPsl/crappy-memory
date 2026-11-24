@@ -13,7 +13,7 @@ import (
 	"github.com/vitaliipsl/crappy-memory/index/vector"
 	"github.com/vitaliipsl/crappy-memory/index/vector/storage/inmemory"
 	"github.com/vitaliipsl/crappy-memory/memory"
-	"github.com/vitaliipsl/crappy-memory/pipeline"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 	jsonstore "github.com/vitaliipsl/crappy-memory/storage/json"
 )
 
@@ -64,17 +64,12 @@ func evaluateDataset(ctx context.Context, corpus dataset, embedder vector.Embedd
 		}
 	}
 
-	keywords, err := bm25.New(ctx, store)
+	keywords, err := bm25.New(memory.Items(ctx, store))
 	if err != nil {
 		return nil, err
 	}
 
-	lexical, err := pipeline.New(store, pipeline.WithRetrievers(keywords))
-	if err != nil {
-		return nil, err
-	}
-
-	baseline, err := evaluate(ctx, "bm25", memory.New(store, memory.WithPipeline(lexical)), corpus.Queries, limit, runs)
+	baseline, err := evaluate(ctx, "bm25", memory.New(store, memory.WithRetriever(keywords)), corpus.Queries, limit, runs)
 	if err != nil {
 		return nil, err
 	}
@@ -83,35 +78,30 @@ func evaluateDataset(ctx context.Context, corpus dataset, embedder vector.Embedd
 		return []evaluation{baseline}, nil
 	}
 
-	semantic, err := vector.New(ctx, store, inmemory.New(), embedder)
+	semantic, err := vector.New(ctx, memory.Items(ctx, store), inmemory.New(), embedder)
 	if err != nil {
 		return nil, err
 	}
 
-	vectors, err := pipeline.New(store, pipeline.WithRetrievers(semantic))
+	rrf, err := retrieval.NewRRF()
 	if err != nil {
 		return nil, err
 	}
 
-	rrf, err := pipeline.NewRRF()
-	if err != nil {
-		return nil, err
-	}
-
-	hybrid, err := pipeline.New(store, pipeline.WithRetrievers(keywords, semantic), pipeline.WithMerger(rrf))
+	hybrid, err := retrieval.NewPipeline(retrieval.WithRetrievers(keywords, semantic), retrieval.WithMerger(rrf))
 	if err != nil {
 		return nil, err
 	}
 
 	reports := []evaluation{baseline}
 	for _, mode := range []struct {
-		name     string
-		pipeline memory.Pipeline
+		name      string
+		retriever retrieval.Retriever
 	}{
-		{name: "vector", pipeline: vectors},
-		{name: "hybrid", pipeline: hybrid},
+		{name: "vector", retriever: semantic},
+		{name: "hybrid", retriever: hybrid},
 	} {
-		report, err := evaluate(ctx, mode.name, memory.New(store, memory.WithPipeline(mode.pipeline)), corpus.Queries, limit, runs)
+		report, err := evaluate(ctx, mode.name, memory.New(store, memory.WithRetriever(mode.retriever)), corpus.Queries, limit, runs)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +156,7 @@ func evaluate(ctx context.Context, mode string, memories *memory.Memory, queries
 
 func searchQuery(ctx context.Context, memories *memory.Memory, query query, limit int) (queryResult, error) {
 	started := time.Now()
-	results, err := memories.Search(ctx, query.Text, memory.WithScopes(query.Scopes...), memory.WithLimit(limit))
+	results, err := memories.Search(ctx, query.Text, retrieval.WithScopes(query.Scopes...), retrieval.WithLimit(limit))
 	elapsed := time.Since(started)
 
 	if err != nil {

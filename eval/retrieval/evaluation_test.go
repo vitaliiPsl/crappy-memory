@@ -10,8 +10,6 @@ import (
 	"slices"
 	"testing"
 	"time"
-
-	"github.com/vitaliipsl/crappy-memory/index/vector"
 )
 
 func TestScore(t *testing.T) {
@@ -166,19 +164,19 @@ func (*fixtureEmbedder) Space() string {
 	return "evaluation-fixture"
 }
 
-func (e *fixtureEmbedder) EmbedQuery(_ context.Context, text string) (vector.Embedding, error) {
+func (e *fixtureEmbedder) EmbedQuery(_ context.Context, text string) ([]float32, error) {
 	e.calls++
 
 	values, exists := e.vectors[text]
 	if !exists {
-		return vector.Embedding{}, fmt.Errorf("no fixture embedding for %q", text)
+		return nil, fmt.Errorf("no fixture embedding for %q", text)
 	}
 
-	return vector.Embedding{Values: values}, nil
+	return values, nil
 }
 
-func (e *fixtureEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([]vector.Embedding, error) {
-	embeddings := make([]vector.Embedding, len(texts))
+func (e *fixtureEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
+	embeddings := make([][]float32, len(texts))
 	for position, text := range texts {
 		embedding, err := e.EmbedQuery(ctx, text)
 		if err != nil {

@@ -47,12 +47,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-index, err := bm25.New(ctx, store)
-if err != nil {
-    log.Fatal(err)
-}
-
-search, err := pipeline.New(store, pipeline.WithRetrievers(index))
+index, err := bm25.New(memory.Items(ctx, store))
 if err != nil {
     log.Fatal(err)
 }
@@ -61,7 +56,7 @@ memories := memory.New(store,
     memory.WithIndexer(index, func(_ context.Context, err error) {
         log.Printf("memory indexing: %v", err)
     }),
-    memory.WithPipeline(search),
+    memory.WithRetriever(index),
 )
 
 _, err = memories.Create(ctx, "personal", "Prefers table-driven tests in Go.")
@@ -69,7 +64,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-results, err := memories.Search(ctx, "go tests", memory.WithScopes("personal"))
+results, err := memories.Search(ctx, "go tests", retrieval.WithScopes("personal"))
 if err != nil {
     log.Fatal(err)
 }
@@ -79,7 +74,7 @@ for _, result := range results {
 }
 ```
 
-The index is passed twice: `WithIndexer` keeps it in sync with writes, and `WithRetrievers` lets search use it.
+The index is passed twice: `WithIndexer` keeps it in sync with writes, and `WithRetriever` lets search use it.
 
 ## Memory
 
@@ -116,16 +111,16 @@ store, err := sqlitestore.New(db)
 
 ```go
 results, err := memories.Search(ctx, "preferred test style",
-    memory.WithScopes("personal", "project:website"),
-    memory.WithLimit(5),
+    retrieval.WithScopes("personal", "project:website"),
+    retrieval.WithLimit(5),
 )
 ```
 
-Search runs through a `pipeline.Pipeline`. Every retriever returns candidates, each candidate is loaded from the store, and deleted, outdated, or filtered-out entries are dropped. Results always carry the stored entry, so a stale index can hide an entry but never return old content.
+Search asks the retriever for candidates, loads them from the store in one read, and drops deleted, outdated, or filtered-out entries. Results always carry the stored entry, so a stale index can hide an entry but never return old content.
 
-`index/bm25` is an in-memory keyword index that `bm25.New` rebuilds from the store. It matches lowercase words without stemming, so `convention` doesn't match `conventions`.
+`index/bm25` is an in-memory keyword index that `bm25.New` builds from `memory.Items`. It matches lowercase words without stemming, so `convention` doesn't match `conventions`.
 
-Multiple retrievers need a merger. `pipeline.NewRRF()` provides reciprocal rank fusion. Scores come from the retriever, or from the merger when there are several, so compare them only within one setup.
+A `retrieval.Pipeline` combines several retrievers into one with a merger. `retrieval.NewRRF()` provides reciprocal rank fusion. Scores come from the retriever, or from the merger when there are several, so compare them only within one setup.
 
 ## Vector search
 
@@ -137,30 +132,30 @@ embedder, err := ollama.New("nomic-embed-text",
     ollama.WithDocumentPrefix("search_document: "),
 )
 vectors, err := vectorsqlite.New(db)
-semantic, err := vector.New(ctx, store, vectors, embedder)
-rrf, err := pipeline.NewRRF()
+semantic, err := vector.New(ctx, memory.Items(ctx, store), vectors, embedder)
+rrf, err := retrieval.NewRRF()
 
-search, err := pipeline.New(store,
-    pipeline.WithRetrievers(keywords, semantic),
-    pipeline.WithMerger(rrf),
+search, err := retrieval.NewPipeline(
+    retrieval.WithRetrievers(keywords, semantic),
+    retrieval.WithMerger(rrf),
 )
 
 memories := memory.New(store,
     memory.WithIndexer(keywords, onIndexError),
     memory.WithIndexer(semantic, onIndexError),
-    memory.WithPipeline(search),
+    memory.WithRetriever(search),
 )
 ```
 
-Vectors live in memory (`index/vector/storage/inmemory`) or in a `vectors` table (`index/vector/storage/sqlite`) that can share the entry store's database. Both search exactly, using cosine similarity by default.
+Vectors live in memory (`index/vector/storage/inmemory`) or in a SQLite table (`index/vector/storage/sqlite`) that can share the entry store's database; `WithTable` gives each index its own table. Both search exactly, using cosine similarity by default.
 
-`vector.New` reconciles before returning. It drops vectors of deleted entries, embeds entries that are new, changed, or from another embedding space, and fails if any embedding fails. The Ollama space comes from the model name and prefixes, so changing them re-embeds everything. Truncation is off, so text longer than the model's context fails to embed.
+`vector.New` reconciles before returning. It drops vectors of items it wasn't given, embeds items that are new, changed, or from another embedding space, and fails if any embedding fails. The Ollama space comes from the model name and prefixes, so changing them re-embeds everything. Truncation is off, so text longer than the model's context fails to embed.
 
 ## Consistency
 
 - `Memory` writes to the store first, then updates every index. Index failures go to the indexer's handler and never fail the write; a missed update heals on the entry's next write or the next rebuild.
 - Build indexes before constructing `Memory`, while nothing writes to the store.
-- Serialize writes to the same entry. Out-of-order index updates leave an old version indexed, and search skips the entry until it changes again.
+- Indexes ignore updates older than the version they hold, so concurrent writes to one entry can't leave an old version indexed.
 - Databases, embedders, and HTTP clients you pass in stay yours to configure and close.
 
 ## Extending
@@ -168,10 +163,9 @@ Vectors live in memory (`index/vector/storage/inmemory`) or in a `vectors` table
 Everything is an interface. If something doesn't fit, replace it.
 
 - **Store** — `memory.Store`
-- **Indexer** — `memory.Indexer`
-- **Retriever** — `memory.Retriever`, returning candidate IDs with their indexed version, or 0 if unknown
-- **Merger** — `memory.Merger`
-- **Pipeline** — `memory.Pipeline`
+- **Indexer** — `retrieval.Indexer`
+- **Retriever** — `retrieval.Retriever`, returning candidate IDs with their indexed version, or 0 if unknown
+- **Merger** — `retrieval.Merger`
 - **Embedder** — `vector.Embedder`
 - **Vector store** — `vector.Store`
 - **Similarity** — `vector.Similarity`

@@ -5,18 +5,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"slices"
 	"strings"
 	"sync"
 	"unicode"
 
-	"github.com/vitaliipsl/crappy-memory/memory"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 )
 
 var (
-	_ memory.Indexer   = (*Index)(nil)
-	_ memory.Retriever = (*Index)(nil)
+	_ retrieval.Indexer   = (*Index)(nil)
+	_ retrieval.Retriever = (*Index)(nil)
 )
 
 const (
@@ -57,7 +58,7 @@ type document struct {
 	length  int
 }
 
-func New(ctx context.Context, store memory.Store, options ...Option) (*Index, error) {
+func New(items iter.Seq2[retrieval.Item, error], options ...Option) (*Index, error) {
 	index := &Index{
 		k1:        defaultSaturation,
 		b:         defaultLengthNormalization,
@@ -76,48 +77,26 @@ func New(ctx context.Context, store memory.Store, options ...Option) (*Index, er
 		return nil, fmt.Errorf("BM25 length normalization must be in [0, 1]: %g", index.b)
 	}
 
-	filter := memory.Filter{Limit: memory.DefaultPageSize}
-
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		page, err := store.List(ctx, filter)
+	for item, err := range items {
 		if err != nil {
-			return nil, fmt.Errorf("load BM25 entries: %w", err)
+			return nil, fmt.Errorf("load BM25 items: %w", err)
 		}
 
-		for _, entry := range page.Entries {
-			if err := index.Upsert(ctx, entry); err != nil {
-				return nil, fmt.Errorf("index entry %q: %w", entry.ID, err)
-			}
+		doc, err := newDocument(item)
+		if err != nil {
+			return nil, fmt.Errorf("index item %q: %w", item.ID, err)
 		}
 
-		if page.NextID == "" {
-			return index, nil
-		}
-
-		filter.AfterID = page.NextID
+		index.put(item.ID, doc)
 	}
+
+	return index, nil
 }
 
-func (i *Index) Upsert(ctx context.Context, entry memory.Entry) error {
-	if entry.ID == "" || entry.Version == 0 {
-		return errors.New("indexed entry ID and version are required")
-	}
-
-	terms := tokenize(entry.Content)
-
-	doc := document{
-		scope:   entry.Scope,
-		version: entry.Version,
-		terms:   make(map[string]int),
-		length:  len(terms),
-	}
-
-	for _, term := range terms {
-		doc.terms[term]++
+func (i *Index) Upsert(ctx context.Context, item retrieval.Item) error {
+	doc, err := newDocument(item)
+	if err != nil {
+		return err
 	}
 
 	i.mu.Lock()
@@ -127,24 +106,14 @@ func (i *Index) Upsert(ctx context.Context, entry memory.Entry) error {
 		return err
 	}
 
-	i.removeDocument(entry.ID)
-	i.documents[entry.ID] = doc
-	i.totalLength += doc.length
-
-	for term := range doc.terms {
-		if i.postings[term] == nil {
-			i.postings[term] = make(map[string]struct{})
-		}
-
-		i.postings[term][entry.ID] = struct{}{}
-	}
+	i.put(item.ID, doc)
 
 	return nil
 }
 
 func (i *Index) Remove(ctx context.Context, id string) error {
 	if id == "" {
-		return errors.New("removed entry ID is required")
+		return errors.New("removed item ID is required")
 	}
 
 	i.mu.Lock()
@@ -159,15 +128,15 @@ func (i *Index) Remove(ctx context.Context, id string) error {
 	return nil
 }
 
-// Retrieve returns higher BM25 scores first, with entry IDs breaking ties.
-func (i *Index) Retrieve(ctx context.Context, query memory.Query) ([]memory.Candidate, error) {
+// Retrieve returns higher BM25 scores first, with item IDs breaking ties.
+func (i *Index) Retrieve(ctx context.Context, query retrieval.Query) ([]retrieval.Candidate, error) {
 	if query.Limit < 0 {
 		return nil, errors.New("retrieval limit cannot be negative")
 	}
 
 	limit := query.Limit
 	if limit == 0 {
-		limit = memory.DefaultSearchLimit
+		limit = retrieval.DefaultSearchLimit
 	}
 
 	terms := tokenize(query.Text)
@@ -182,7 +151,7 @@ func (i *Index) Retrieve(ctx context.Context, query memory.Query) ([]memory.Cand
 	}
 
 	if len(i.documents) == 0 {
-		return []memory.Candidate{}, nil
+		return []retrieval.Candidate{}, nil
 	}
 
 	documentCount := float64(len(i.documents))
@@ -214,12 +183,12 @@ func (i *Index) Retrieve(ctx context.Context, query memory.Query) ([]memory.Cand
 		}
 	}
 
-	candidates := make([]memory.Candidate, 0, len(scores))
+	candidates := make([]retrieval.Candidate, 0, len(scores))
 	for id, score := range scores {
-		candidates = append(candidates, memory.Candidate{ID: id, Version: i.documents[id].version, Score: score})
+		candidates = append(candidates, retrieval.Candidate{ID: id, Version: i.documents[id].version, Score: score})
 	}
 
-	slices.SortFunc(candidates, func(a, b memory.Candidate) int {
+	slices.SortFunc(candidates, func(a, b retrieval.Candidate) int {
 		if order := cmp.Compare(b.Score, a.Score); order != 0 {
 			return order
 		}
@@ -228,6 +197,24 @@ func (i *Index) Retrieve(ctx context.Context, query memory.Query) ([]memory.Cand
 	})
 
 	return candidates[:min(limit, len(candidates))], nil
+}
+
+func (i *Index) put(id string, doc document) {
+	if current, found := i.documents[id]; found && current.version >= doc.version {
+		return
+	}
+
+	i.removeDocument(id)
+	i.documents[id] = doc
+	i.totalLength += doc.length
+
+	for term := range doc.terms {
+		if i.postings[term] == nil {
+			i.postings[term] = make(map[string]struct{})
+		}
+
+		i.postings[term][id] = struct{}{}
+	}
 }
 
 func (i *Index) removeDocument(id string) {
@@ -242,6 +229,27 @@ func (i *Index) removeDocument(id string) {
 
 	i.totalLength -= doc.length
 	delete(i.documents, id)
+}
+
+func newDocument(item retrieval.Item) (document, error) {
+	if item.ID == "" || item.Version == 0 {
+		return document{}, errors.New("indexed item ID and version are required")
+	}
+
+	terms := tokenize(item.Text)
+
+	doc := document{
+		scope:   item.Scope,
+		version: item.Version,
+		terms:   make(map[string]int),
+		length:  len(terms),
+	}
+
+	for _, term := range terms {
+		doc.terms[term]++
+	}
+
+	return doc, nil
 }
 
 func tokenize(text string) []string {

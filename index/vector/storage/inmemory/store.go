@@ -1,10 +1,8 @@
 package inmemory
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -14,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/vitaliipsl/crappy-memory/index/vector"
-	"github.com/vitaliipsl/crappy-memory/memory"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 )
 
 var _ vector.Store = (*Store)(nil)
@@ -62,14 +60,9 @@ func (s *Store) Get(ctx context.Context, id string) (vector.Record, error) {
 	return copyRecord(record), nil
 }
 
-func (s *Store) List(ctx context.Context, filter memory.Filter) (vector.Page, error) {
-	if filter.Limit < 0 {
-		return vector.Page{}, errors.New("vector list limit cannot be negative")
-	}
-
-	limit := filter.Limit
-	if limit == 0 {
-		limit = memory.DefaultPageSize
+func (s *Store) List(ctx context.Context, afterID string, limit int) (vector.Page, error) {
+	if limit <= 0 {
+		return vector.Page{}, errors.New("vector list limit must be positive")
 	}
 
 	s.mu.RLock()
@@ -79,22 +72,9 @@ func (s *Store) List(ctx context.Context, filter memory.Filter) (vector.Page, er
 		return vector.Page{}, err
 	}
 
-	ids := slices.Sorted(maps.Keys(s.records))
-	query := memory.Query{
-		Scopes: filter.Scopes,
-		IDs:    filter.IDs,
-	}
-
-	page := vector.Page{
-		Records: make([]vector.Record, 0, min(limit, len(ids))),
-	}
-	for _, id := range ids {
-		if err := ctx.Err(); err != nil {
-			return vector.Page{}, err
-		}
-
-		record := s.records[id]
-		if id <= filter.AfterID || !query.MatchesFilters(id, record.Scope) {
+	page := vector.Page{Records: make([]vector.Record, 0, min(limit, len(s.records)))}
+	for _, id := range slices.Sorted(maps.Keys(s.records)) {
+		if id <= afterID {
 			continue
 		}
 
@@ -104,7 +84,7 @@ func (s *Store) List(ctx context.Context, filter memory.Filter) (vector.Page, er
 			break
 		}
 
-		page.Records = append(page.Records, copyRecord(record))
+		page.Records = append(page.Records, copyRecord(s.records[id]))
 	}
 
 	return page, nil
@@ -163,7 +143,7 @@ func (s *Store) Remove(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candidate, error) {
+func (s *Store) Search(ctx context.Context, query vector.Query) ([]retrieval.Candidate, error) {
 	if strings.TrimSpace(query.Space) == "" {
 		return nil, errors.New("query space is required")
 	}
@@ -178,7 +158,7 @@ func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candid
 
 	limit := query.Limit
 	if limit == 0 {
-		limit = memory.DefaultSearchLimit
+		limit = retrieval.DefaultSearchLimit
 	}
 
 	s.mu.RLock()
@@ -188,12 +168,12 @@ func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candid
 		return nil, err
 	}
 
-	filter := memory.Query{
+	filter := retrieval.Query{
 		Scopes: query.Scopes,
 		IDs:    query.IDs,
 	}
 
-	candidates := make([]memory.Candidate, 0, len(s.records))
+	candidates := make([]retrieval.Candidate, 0, len(s.records))
 	for _, record := range s.records {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -212,10 +192,10 @@ func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candid
 			return nil, fmt.Errorf("vector %q similarity score must be finite", record.ID)
 		}
 
-		candidates = append(candidates, memory.Candidate{ID: record.ID, Version: record.Version, Score: score})
+		candidates = append(candidates, retrieval.Candidate{ID: record.ID, Version: record.Version, Score: score})
 	}
 
-	slices.SortFunc(candidates, func(a, b memory.Candidate) int {
+	slices.SortFunc(candidates, func(a, b retrieval.Candidate) int {
 		if order := cmp.Compare(b.Score, a.Score); order != 0 {
 			return order
 		}
@@ -246,14 +226,6 @@ func validateVector(values []float32) error {
 
 func copyRecord(record vector.Record) vector.Record {
 	record.Values = slices.Clone(record.Values)
-	if record.Metadata != nil {
-		metadata := make(map[string]json.RawMessage, len(record.Metadata))
-		for key, value := range record.Metadata {
-			metadata[key] = bytes.Clone(value)
-		}
-
-		record.Metadata = metadata
-	}
 
 	return record
 }

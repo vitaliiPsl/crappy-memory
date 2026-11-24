@@ -82,16 +82,16 @@ func (e *Embedder) Space() string {
 	return e.space
 }
 
-func (e *Embedder) EmbedQuery(ctx context.Context, text string) (vector.Embedding, error) {
+func (e *Embedder) EmbedQuery(ctx context.Context, text string) ([]float32, error) {
 	embeddings, err := e.embed(ctx, []string{e.queryPrefix + text})
 	if err != nil {
-		return vector.Embedding{}, err
+		return nil, err
 	}
 
 	return embeddings[0], nil
 }
 
-func (e *Embedder) EmbedDocuments(ctx context.Context, texts []string) ([]vector.Embedding, error) {
+func (e *Embedder) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
 	inputs := make([]string, len(texts))
 	for position, text := range texts {
 		inputs[position] = e.documentPrefix + text
@@ -100,13 +100,13 @@ func (e *Embedder) EmbedDocuments(ctx context.Context, texts []string) ([]vector
 	return e.embed(ctx, inputs)
 }
 
-func (e *Embedder) embed(ctx context.Context, texts []string) ([]vector.Embedding, error) {
+func (e *Embedder) embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
 	if len(texts) == 0 {
-		return []vector.Embedding{}, nil
+		return [][]float32{}, nil
 	}
 
 	payload := struct {
@@ -146,7 +146,6 @@ func (e *Embedder) embed(ctx context.Context, texts []string) ([]vector.Embeddin
 	}
 
 	var result struct {
-		Model      string      `json:"model"`
 		Embeddings [][]float32 `json:"embeddings"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
@@ -157,21 +156,5 @@ func (e *Embedder) embed(ctx context.Context, texts []string) ([]vector.Embeddin
 		return nil, fmt.Errorf("ollama returned %d embeddings for %d inputs", len(result.Embeddings), len(texts))
 	}
 
-	if result.Model == "" {
-		return nil, errors.New("ollama embedding response has no model")
-	}
-
-	embeddings := make([]vector.Embedding, len(texts))
-	for position, values := range result.Embeddings {
-		model, _ := json.Marshal(result.Model)
-		embeddings[position] = vector.Embedding{
-			Values: values,
-			Metadata: map[string]json.RawMessage{
-				"provider": json.RawMessage(`"ollama"`),
-				"model":    model,
-			},
-		}
-	}
-
-	return embeddings, nil
+	return result.Embeddings, nil
 }

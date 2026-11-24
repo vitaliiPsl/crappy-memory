@@ -1,4 +1,4 @@
-package pipeline
+package retrieval
 
 import (
 	"cmp"
@@ -6,11 +6,9 @@ import (
 	"errors"
 	"slices"
 	"strings"
-
-	"github.com/vitaliipsl/crappy-memory/memory"
 )
 
-var _ memory.Merger = (*RRF)(nil)
+var _ Merger = (*RRF)(nil)
 
 const DefaultRankConstant = 60
 
@@ -39,47 +37,45 @@ func NewRRF(options ...RRFOption) (*RRF, error) {
 	return rrf, nil
 }
 
-func (f *RRF) Merge(ctx context.Context, lists [][]memory.SearchResult) ([]memory.SearchResult, error) {
+// Merge keeps the newest version any list reported, so one lagging index doesn't make a candidate stale.
+func (f *RRF) Merge(ctx context.Context, lists [][]Candidate) ([]Candidate, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	combined := make(map[string]memory.SearchResult)
+	combined := make(map[string]Candidate)
 	for _, list := range lists {
 		seen := make(map[string]bool)
 
 		rank := 0
-		for _, result := range list {
-			id := result.Entry.ID
-			if seen[id] {
+		for _, candidate := range list {
+			if seen[candidate.ID] {
 				continue
 			}
 
-			seen[id] = true
+			seen[candidate.ID] = true
 			rank++
 
-			fused, exists := combined[id]
-			if !exists {
-				fused.Entry = result.Entry
-			}
-
+			fused := combined[candidate.ID]
+			fused.ID = candidate.ID
+			fused.Version = max(fused.Version, candidate.Version)
 			fused.Score += 1 / (float64(f.rankConstant) + float64(rank))
-			combined[id] = fused
+			combined[candidate.ID] = fused
 		}
 	}
 
-	results := make([]memory.SearchResult, 0, len(combined))
-	for _, result := range combined {
-		results = append(results, result)
+	candidates := make([]Candidate, 0, len(combined))
+	for _, candidate := range combined {
+		candidates = append(candidates, candidate)
 	}
 
-	slices.SortFunc(results, func(a, b memory.SearchResult) int {
+	slices.SortFunc(candidates, func(a, b Candidate) int {
 		if order := cmp.Compare(b.Score, a.Score); order != 0 {
 			return order
 		}
 
-		return strings.Compare(a.Entry.ID, b.Entry.ID)
+		return strings.Compare(a.ID, b.ID)
 	})
 
-	return results, nil
+	return candidates, nil
 }

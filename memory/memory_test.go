@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/vitaliipsl/crappy-memory/memory"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 	jsonstore "github.com/vitaliipsl/crappy-memory/storage/json"
 )
 
@@ -318,47 +320,122 @@ func TestMemoryRejectsEmptyContent(t *testing.T) {
 	}
 }
 
-func TestMemorySearchRequiresPipeline(t *testing.T) {
+func TestMemorySearchRequiresRetriever(t *testing.T) {
 	t.Parallel()
 
 	store := openJSONStore(t, filepath.Join(t.TempDir(), "entries.json"))
-	if results, err := memory.New(store).Search(t.Context(), "query"); !errors.Is(err, memory.ErrPipelineRequired) || results != nil {
+	if results, err := memory.New(store).Search(t.Context(), "query"); !errors.Is(err, memory.ErrRetrieverRequired) || results != nil {
 		t.Fatalf("unconfigured search = %+v, %v", results, err)
 	}
 }
 
-func TestMemorySearchDelegatesToPipeline(t *testing.T) {
+func TestMemorySearchResolvesCandidatesWithOneStoreRead(t *testing.T) {
 	t.Parallel()
+
 	ctx := t.Context()
-	store := openJSONStore(t, filepath.Join(t.TempDir(), "entries.json"))
-	want := []memory.SearchResult{{Entry: memory.Entry{ID: "entry", Content: "canonical"}, Score: 3}}
-	search := pipelineFunc(func(received context.Context, query memory.Query) ([]memory.SearchResult, error) {
-		if received != ctx || query.Text != "question" || query.Limit != 2 || !slices.Equal(query.Scopes, []string{"personal"}) || !slices.Equal(query.IDs, []string{"entry"}) {
-			t.Fatalf("pipeline request = %+v", query)
+	first := memory.Entry{ID: "first", Scope: "selected", Content: "first", Version: 1}
+	second := memory.Entry{ID: "second", Scope: "selected", Content: "second", Version: 3}
+	wrongScope := memory.Entry{ID: "wrong-scope", Scope: "selected/child", Content: "child", Version: 1}
+	excluded := memory.Entry{ID: "excluded", Scope: "selected", Content: "excluded", Version: 1}
+	stale := memory.Entry{ID: "stale", Scope: "selected", Content: "newer", Version: 2}
+	entries := []memory.Entry{first, second, wrongScope, excluded, stale}
+
+	var reads []memory.Filter
+
+	store := newListStore(func(_ context.Context, filter memory.Filter) (memory.Page, error) {
+		reads = append(reads, filter)
+
+		var page memory.Page
+		for _, entry := range entries {
+			if slices.Contains(filter.IDs, entry.ID) {
+				page.Entries = append(page.Entries, entry)
+			}
 		}
 
-		return want, nil
+		return page, nil
 	})
-	mem := memory.New(store, memory.WithPipeline(search))
 
-	results, err := mem.Search(ctx, "question", memory.WithScopes("personal"), memory.WithIDs("entry"), memory.WithLimit(2))
-	if err != nil || len(results) != 1 || results[0].Entry.ID != "entry" || results[0].Score != 3 {
-		t.Fatalf("pipeline results = %+v, %v", results, err)
+	candidates := []retrieval.Candidate{
+		{ID: "deleted", Version: 1, Score: 100},
+		{ID: wrongScope.ID, Version: 1, Score: 90},
+		{ID: stale.ID, Version: 1, Score: 80},
+		{ID: excluded.ID, Version: 1, Score: 70},
+		{ID: first.ID, Version: 2, Score: 60},
+		{ID: first.ID, Version: 1, Score: 5},
+		{ID: first.ID, Version: 1, Score: 4},
+		{ID: second.ID, Score: 2},
+	}
+	ids := []string{first.ID, second.ID, wrongScope.ID, stale.ID, "deleted"}
+	retriever := retrieverFunc(func(received context.Context, query retrieval.Query) ([]retrieval.Candidate, error) {
+		if received != ctx || query.Text != "question" || query.Limit != 2 || !slices.Equal(query.Scopes, []string{"selected"}) || !slices.Equal(query.IDs, ids) {
+			t.Fatalf("retriever query = %+v", query)
+		}
+
+		return candidates, nil
+	})
+
+	results, err := memory.New(store, memory.WithRetriever(retriever)).Search(ctx, "question",
+		retrieval.WithScopes("selected"), retrieval.WithIDs(ids...), retrieval.WithLimit(2),
+	)
+	if err != nil || !reflect.DeepEqual(results, []memory.SearchResult{{Entry: first, Score: 5}, {Entry: second, Score: 2}}) {
+		t.Fatalf("resolved results = %+v, %v", results, err)
 	}
 
-	failure := errors.New("pipeline unavailable")
-
-	mem = memory.New(store, memory.WithPipeline(pipelineFunc(func(context.Context, memory.Query) ([]memory.SearchResult, error) {
-		return nil, failure
-	})))
-	if results, err := mem.Search(ctx, "question"); !errors.Is(err, failure) || results != nil {
-		t.Fatalf("pipeline failure = %+v, %v", results, err)
+	candidateIDs := []string{"deleted", wrongScope.ID, stale.ID, excluded.ID, first.ID, first.ID, first.ID, second.ID}
+	if len(reads) != 1 || !slices.Equal(reads[0].IDs, candidateIDs) || reads[0].Limit != len(candidateIDs) {
+		t.Fatalf("store reads = %+v", reads)
 	}
 }
 
-type pipelineFunc func(context.Context, memory.Query) ([]memory.SearchResult, error)
+func TestMemorySearchWithoutCandidatesSkipsStore(t *testing.T) {
+	t.Parallel()
 
-func (fn pipelineFunc) Search(ctx context.Context, query memory.Query) ([]memory.SearchResult, error) {
+	store := newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
+		t.Fatal("search without candidates read the store")
+
+		return memory.Page{}, nil
+	})
+	retriever := retrieverFunc(func(context.Context, retrieval.Query) ([]retrieval.Candidate, error) {
+		return nil, nil
+	})
+
+	results, err := memory.New(store, memory.WithRetriever(retriever)).Search(t.Context(), "question")
+	if err != nil || results == nil || len(results) != 0 {
+		t.Fatalf("empty search = %+v, %v", results, err)
+	}
+}
+
+func TestMemorySearchPropagatesFailuresWithoutPartialResults(t *testing.T) {
+	t.Parallel()
+
+	failure := errors.New("retrieval unavailable")
+	store := newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
+		return memory.Page{Entries: []memory.Entry{{ID: "note", Version: 1}}}, nil
+	})
+	retriever := retrieverFunc(func(context.Context, retrieval.Query) ([]retrieval.Candidate, error) {
+		return []retrieval.Candidate{{ID: "note", Version: 1}}, failure
+	})
+
+	if results, err := memory.New(store, memory.WithRetriever(retriever)).Search(t.Context(), "question"); !errors.Is(err, failure) || results != nil {
+		t.Fatalf("failed retrieval = %+v, %v", results, err)
+	}
+
+	failure = errors.New("store unavailable")
+	store = newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
+		return memory.Page{}, failure
+	})
+	retriever = retrieverFunc(func(context.Context, retrieval.Query) ([]retrieval.Candidate, error) {
+		return []retrieval.Candidate{{ID: "note", Version: 1}}, nil
+	})
+
+	if results, err := memory.New(store, memory.WithRetriever(retriever)).Search(t.Context(), "question"); !errors.Is(err, failure) || results != nil {
+		t.Fatalf("failed store read = %+v, %v", results, err)
+	}
+}
+
+type retrieverFunc func(context.Context, retrieval.Query) ([]retrieval.Candidate, error)
+
+func (fn retrieverFunc) Retrieve(ctx context.Context, query retrieval.Query) ([]retrieval.Candidate, error) {
 	return fn(ctx, query)
 }
 
@@ -372,9 +449,9 @@ func TestMemoryReportsIndexFailuresWithoutFailingCanonicalWrites(t *testing.T) {
 	var failures []error
 
 	broken := newTestIndexer(
-		func(ctx context.Context, entry memory.Entry) error {
-			loaded, err := store.Get(ctx, entry.ID)
-			if err != nil || loaded.Version != entry.Version || loaded.Content != entry.Content {
+		func(ctx context.Context, item retrieval.Item) error {
+			loaded, err := store.Get(ctx, item.ID)
+			if err != nil || loaded.Version != item.Version || loaded.Scope != item.Scope || loaded.Content != item.Text {
 				t.Fatalf("indexing ran before persistence: %+v, %v", loaded, err)
 			}
 
@@ -390,8 +467,8 @@ func TestMemoryReportsIndexFailuresWithoutFailingCanonicalWrites(t *testing.T) {
 	)
 	indexed := make(map[string]uint64)
 	healthy := newTestIndexer(
-		func(_ context.Context, entry memory.Entry) error {
-			indexed[entry.ID] = entry.Version
+		func(_ context.Context, item retrieval.Item) error {
+			indexed[item.ID] = item.Version
 
 			return nil
 		},
@@ -460,7 +537,7 @@ func TestMemoryDoesNotIndexFailedCanonicalWrites(t *testing.T) {
 
 	notifications := 0
 	index := newTestIndexer(
-		func(context.Context, memory.Entry) error {
+		func(context.Context, retrieval.Item) error {
 			notifications++
 
 			return nil
@@ -508,7 +585,7 @@ func TestMemoryRepeatedDeleteRetriesIndexRemoval(t *testing.T) {
 	store := openJSONStore(t, filepath.Join(t.TempDir(), "entries.json"))
 	failure := errors.New("temporary removal failure")
 	attempts := 0
-	retrying := newTestIndexer(func(context.Context, memory.Entry) error { return nil }, func(context.Context, string) error {
+	retrying := newTestIndexer(func(context.Context, retrieval.Item) error { return nil }, func(context.Context, string) error {
 		attempts++
 		if attempts == 1 {
 			return failure
@@ -543,16 +620,16 @@ func TestMemoryRepeatedDeleteRetriesIndexRemoval(t *testing.T) {
 }
 
 type testIndexer struct {
-	upsert func(context.Context, memory.Entry) error
+	upsert func(context.Context, retrieval.Item) error
 	remove func(context.Context, string) error
 }
 
-func newTestIndexer(upsert func(context.Context, memory.Entry) error, remove func(context.Context, string) error) *testIndexer {
+func newTestIndexer(upsert func(context.Context, retrieval.Item) error, remove func(context.Context, string) error) *testIndexer {
 	return &testIndexer{upsert: upsert, remove: remove}
 }
 
-func (i *testIndexer) Upsert(ctx context.Context, entry memory.Entry) error {
-	return i.upsert(ctx, entry)
+func (i *testIndexer) Upsert(ctx context.Context, item retrieval.Item) error {
+	return i.upsert(ctx, item)
 }
 
 func (i *testIndexer) Remove(ctx context.Context, id string) error {

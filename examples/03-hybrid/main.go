@@ -12,7 +12,7 @@ import (
 	"github.com/vitaliipsl/crappy-memory/index/vector/embedding/ollama"
 	"github.com/vitaliipsl/crappy-memory/index/vector/storage/inmemory"
 	"github.com/vitaliipsl/crappy-memory/memory"
-	"github.com/vitaliipsl/crappy-memory/pipeline"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 	jsonstore "github.com/vitaliipsl/crappy-memory/storage/json"
 )
 
@@ -37,7 +37,7 @@ func run() error {
 		return err
 	}
 
-	keywords, err := bm25.New(ctx, store)
+	keywords, err := bm25.New(memory.Items(ctx, store))
 	if err != nil {
 		return err
 	}
@@ -49,19 +49,19 @@ func run() error {
 		return err
 	}
 
-	semantic, err := vector.New(ctx, store, inmemory.New(), embedder)
+	semantic, err := vector.New(ctx, memory.Items(ctx, store), inmemory.New(), embedder)
 	if err != nil {
 		return err
 	}
 
-	merger, err := pipeline.NewRRF()
+	merger, err := retrieval.NewRRF()
 	if err != nil {
 		return err
 	}
 
-	search, err := pipeline.New(store,
-		pipeline.WithRetrievers(keywords, semantic),
-		pipeline.WithMerger(merger),
+	search, err := retrieval.NewPipeline(
+		retrieval.WithRetrievers(keywords, semantic),
+		retrieval.WithMerger(merger),
 	)
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func run() error {
 	memories := memory.New(store,
 		memory.WithIndexer(keywords, onIndexError),
 		memory.WithIndexer(semantic, onIndexError),
-		memory.WithPipeline(search),
+		memory.WithRetriever(search),
 	)
 
 	for _, content := range []string{
@@ -86,7 +86,7 @@ func run() error {
 	query := "How verbose should your replies be?"
 	fmt.Println("Query:", query)
 
-	results, err := memories.Search(ctx, query, memory.WithScopes("personal"), memory.WithLimit(2))
+	results, err := memories.Search(ctx, query, retrieval.WithScopes("personal"), retrieval.WithLimit(2))
 	if err != nil {
 		return err
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/vitaliipsl/crappy-memory/index/bm25"
 	"github.com/vitaliipsl/crappy-memory/memory"
-	"github.com/vitaliipsl/crappy-memory/pipeline"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 	jsonstore "github.com/vitaliipsl/crappy-memory/storage/json"
 )
 
@@ -34,19 +34,14 @@ func run() error {
 		return err
 	}
 
-	index, err := bm25.New(ctx, store)
-	if err != nil {
-		return err
-	}
-
-	search, err := pipeline.New(store, pipeline.WithRetrievers(index))
+	index, err := bm25.New(memory.Items(ctx, store))
 	if err != nil {
 		return err
 	}
 
 	memories := memory.New(store,
 		memory.WithIndexer(index, func(_ context.Context, err error) { log.Printf("indexing: %v", err) }),
-		memory.WithPipeline(search),
+		memory.WithRetriever(index),
 	)
 
 	entry, err := memories.Create(ctx, "personal", "Prefers example-based tests in Go.",
@@ -82,7 +77,7 @@ func run() error {
 
 	fmt.Printf("Personal memories: %d\n", len(page.Entries))
 
-	results, err := memories.Search(ctx, "Go tests", memory.WithScopes("personal"), memory.WithLimit(3))
+	results, err := memories.Search(ctx, "Go tests", retrieval.WithScopes("personal"), retrieval.WithLimit(3))
 	if err != nil {
 		return err
 	}
@@ -95,7 +90,7 @@ func run() error {
 		return err
 	}
 
-	results, err = memories.Search(ctx, "Go tests", memory.WithScopes("personal"))
+	results, err = memories.Search(ctx, "Go tests", retrieval.WithScopes("personal"))
 	if err != nil {
 		return err
 	}

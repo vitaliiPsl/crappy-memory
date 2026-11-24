@@ -3,7 +3,6 @@ package sqlite_test
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"math"
 	"net/url"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/vitaliipsl/crappy-memory/index/vector"
 	"github.com/vitaliipsl/crappy-memory/index/vector/storage/sqlite"
-	"github.com/vitaliipsl/crappy-memory/memory"
 )
 
 func TestStorePersistsRecordsAndSearchesAfterReopening(t *testing.T) {
@@ -27,10 +25,7 @@ func TestStorePersistsRecordsAndSearchesAfterReopening(t *testing.T) {
 	store, db := newStore(t, path)
 
 	records := []vector.Record{
-		{
-			ID: "a", Scope: "one", Version: 2, Space: "test-space", Values: []float32{2, 0},
-			Metadata: map[string]json.RawMessage{"model": json.RawMessage(`"model-a"`), "provider": json.RawMessage(`{"name":"local"}`)},
-		},
+		{ID: "a", Scope: "one", Version: 2, Space: "test-space", Values: []float32{2, 0}},
 		{ID: "b", Scope: "two", Version: 1, Space: "test-space", Values: []float32{1, 0}},
 		{ID: "c", Scope: "one", Version: 3, Space: "test-space", Values: []float32{1, 1}},
 		{ID: "d", Scope: "one/child", Version: 1, Space: "test-space", Values: []float32{-1, 0}},
@@ -72,27 +67,34 @@ func TestStorePersistsRecordsAndSearchesAfterReopening(t *testing.T) {
 		t.Fatalf("filtered ranking = %+v, %v", results, err)
 	}
 
-	page, err := store.List(ctx, memory.Filter{Limit: 2})
+	page, err := store.List(ctx, "", 2)
 	if err != nil || len(page.Records) != 2 || page.Records[0].ID != "a" || page.Records[1].ID != "b" || page.NextID != "b" {
 		t.Fatalf("first record page = %+v, %v", page, err)
 	}
 
-	page, err = store.List(ctx, memory.Filter{AfterID: page.NextID, Scopes: []string{"one"}, IDs: []string{"c", "d"}, Limit: 2})
-	if err != nil || len(page.Records) != 1 || page.Records[0].ID != "c" || page.NextID != "" {
-		t.Fatalf("filtered record page = %+v, %v", page, err)
+	page, err = store.List(ctx, page.NextID, 2)
+	if err != nil || len(page.Records) != 2 || page.Records[0].ID != "c" || page.Records[1].ID != "d" || page.NextID != "d" {
+		t.Fatalf("second record page = %+v, %v", page, err)
+	}
+
+	page, err = store.List(ctx, page.NextID, 2)
+	if err != nil || len(page.Records) != 1 || page.Records[0].ID != "e" || page.NextID != "" {
+		t.Fatalf("last record page = %+v, %v", page, err)
+	}
+
+	if _, err := store.List(ctx, "", 0); err == nil {
+		t.Fatal("non-positive list limit accepted")
 	}
 
 	records[0].Values[0] = 9
-	records[0].Metadata["model"][1] = 'x'
 
 	for range 2 {
 		record, err := store.Get(ctx, "a")
-		if err != nil || record.Values[0] != 2 || string(record.Metadata["model"]) != `"model-a"` {
+		if err != nil || record.Values[0] != 2 {
 			t.Fatalf("record data ownership = %+v, %v", record, err)
 		}
 
 		record.Values[0] = 9
-		record.Metadata["model"][1] = 'x'
 	}
 }
 
@@ -141,7 +143,7 @@ func TestStorePersistsReplacementsAndRemovals(t *testing.T) {
 		t.Fatalf("removed vector survived reopening: %v", err)
 	}
 
-	page, err := store.List(ctx, memory.Filter{})
+	page, err := store.List(ctx, "", 10)
 	if err != nil || len(page.Records) != 0 {
 		t.Fatalf("removed vector remained listed: %+v, %v", page, err)
 	}
@@ -234,7 +236,6 @@ func TestStoreRollsBackFailedBatches(t *testing.T) {
 		{ID: "invalid", Version: 1, Space: "space", Values: []float32{0, 0}},
 		{ID: "invalid", Version: 1, Space: "space", Values: []float32{float32(math.NaN())}},
 		{ID: "invalid", Version: 1, Space: "space", Values: []float32{float32(math.Inf(1))}},
-		{ID: "invalid", Version: 1, Space: "space", Values: []float32{1}, Metadata: map[string]json.RawMessage{"bad": json.RawMessage(`{`)}},
 	} {
 		if err := store.Upsert(ctx, []vector.Record{
 			{ID: "existing", Version: 2, Space: "space", Values: []float32{2}},
@@ -262,7 +263,7 @@ func TestStoreRollsBackFailedBatches(t *testing.T) {
 
 	store, _ = newStore(t, path)
 
-	page, err := store.List(ctx, memory.Filter{})
+	page, err := store.List(ctx, "", 10)
 	if err != nil || len(page.Records) != 1 || page.Records[0].ID != "existing" || page.Records[0].Version != 1 || page.Records[0].Values[0] != 1 {
 		t.Fatalf("failed batch committed partial writes: %+v, %v", page, err)
 	}
@@ -323,7 +324,7 @@ func TestStoreHonorsCancellation(t *testing.T) {
 		t.Fatalf("canceled get = %v", err)
 	}
 
-	if _, err := store.List(ctx, memory.Filter{}); !errors.Is(err, context.Canceled) {
+	if _, err := store.List(ctx, "", 10); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled list = %v", err)
 	}
 
@@ -368,6 +369,57 @@ func TestNewLeavesDatabaseLifetimeToCaller(t *testing.T) {
 
 	if _, err := store.Get(t.Context(), "note"); err == nil {
 		t.Fatal("read succeeded after the caller closed the database")
+	}
+}
+
+func TestStoresInSeparateTablesShareADatabase(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	db := openDatabase(t, filepath.Join(t.TempDir(), "vectors.db"))
+
+	entries, err := sqlite.New(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chunks, err := sqlite.New(db, sqlite.WithTable("chunk_vectors"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := entries.Upsert(ctx, []vector.Record{{ID: "entry", Version: 1, Space: "space", Values: []float32{1, 0}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := chunks.Upsert(ctx, []vector.Record{{ID: "chunk", Version: 1, Space: "space", Values: []float32{1, 0}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	for store, want := range map[*sqlite.Store]string{entries: "entry", chunks: "chunk"} {
+		page, err := store.List(ctx, "", 10)
+		if err != nil || len(page.Records) != 1 || page.Records[0].ID != want {
+			t.Fatalf("table records = %+v, %v; want only %q", page, err, want)
+		}
+
+		results, err := store.Search(ctx, vector.Query{Space: "space", Values: []float32{1, 0}})
+		if err != nil || len(results) != 1 || results[0].ID != want {
+			t.Fatalf("table search = %+v, %v; want only %q", results, err, want)
+		}
+	}
+
+	if err := chunks.Remove(ctx, "entry"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := entries.Get(ctx, "entry"); err != nil {
+		t.Fatalf("removal from one table changed another: %v", err)
+	}
+
+	for _, table := range []string{"", "1vectors", "chunk-vectors", `vectors"; DROP TABLE vectors; --`} {
+		if store, err := sqlite.New(db, sqlite.WithTable(table)); store != nil || err == nil {
+			t.Fatalf("invalid table name %q accepted: %v, %v", table, store, err)
+		}
 	}
 }
 

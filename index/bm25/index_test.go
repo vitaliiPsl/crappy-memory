@@ -3,12 +3,13 @@ package bm25_test
 import (
 	"context"
 	"errors"
+	"iter"
 	"math"
 	"strings"
 	"testing"
 
 	"github.com/vitaliipsl/crappy-memory/index/bm25"
-	"github.com/vitaliipsl/crappy-memory/memory"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 )
 
 func TestIndexRanksTermsAndReturnsVersionedCandidates(t *testing.T) {
@@ -17,16 +18,16 @@ func TestIndexRanksTermsAndReturnsVersionedCandidates(t *testing.T) {
 	ctx := t.Context()
 
 	index := newIndex(t)
-	for _, entry := range []memory.Entry{
-		{ID: "a", Scope: "personal", Content: "Alpha", Version: 2},
-		{ID: "b", Scope: "personal", Content: "Beta", Version: 1},
+	for _, item := range []retrieval.Item{
+		{ID: "a", Scope: "personal", Text: "Alpha", Version: 2},
+		{ID: "b", Scope: "personal", Text: "Beta", Version: 1},
 	} {
-		if err := index.Upsert(ctx, entry); err != nil {
+		if err := index.Upsert(ctx, item); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	candidates, err := index.Retrieve(ctx, memory.NewQuery("ALPHA alpha"))
+	candidates, err := index.Retrieve(ctx, retrieval.NewQuery("ALPHA alpha"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,22 +36,22 @@ func TestIndexRanksTermsAndReturnsVersionedCandidates(t *testing.T) {
 		t.Fatalf("candidates = %+v, want entry a with score ln(2)", candidates)
 	}
 
-	for _, entry := range []memory.Entry{
-		{ID: "short", Content: "tool tool", Version: 1},
-		{ID: "long", Content: "tool " + strings.Repeat("unrelated ", 20), Version: 1},
-		{ID: "unicode", Content: "MÉMOIRE, 世界!", Version: 1},
+	for _, item := range []retrieval.Item{
+		{ID: "short", Text: "tool tool", Version: 1},
+		{ID: "long", Text: "tool " + strings.Repeat("unrelated ", 20), Version: 1},
+		{ID: "unicode", Text: "MÉMOIRE, 世界!", Version: 1},
 	} {
-		if err := index.Upsert(ctx, entry); err != nil {
+		if err := index.Upsert(ctx, item); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	candidates, err = index.Retrieve(ctx, memory.NewQuery("tool"))
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("tool"))
 	if err != nil || len(candidates) != 2 || candidates[0].ID != "short" || candidates[0].Score <= candidates[1].Score {
 		t.Fatalf("term frequency and length ranking = %+v, %v", candidates, err)
 	}
 
-	candidates, err = index.Retrieve(ctx, memory.NewQuery("mémoire 世界"))
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("mémoire 世界"))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "unicode" {
 		t.Fatalf("unicode query = %+v, %v", candidates, err)
 	}
@@ -72,16 +73,16 @@ func TestIndexConfiguresSaturation(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			index := newIndex(t, bm25.WithSaturation(test.saturation))
-			for _, entry := range []memory.Entry{
-				{ID: "a-once", Content: "term " + strings.Repeat("filler ", 19), Version: 1},
-				{ID: "b-repeated", Content: strings.Repeat("term ", 20), Version: 1},
+			for _, item := range []retrieval.Item{
+				{ID: "a-once", Text: "term " + strings.Repeat("filler ", 19), Version: 1},
+				{ID: "b-repeated", Text: strings.Repeat("term ", 20), Version: 1},
 			} {
-				if err := index.Upsert(t.Context(), entry); err != nil {
+				if err := index.Upsert(t.Context(), item); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			candidates, err := index.Retrieve(t.Context(), memory.NewQuery("term"))
+			candidates, err := index.Retrieve(t.Context(), retrieval.NewQuery("term"))
 			if err != nil || len(candidates) != 2 || candidates[0].ID != test.firstID {
 				t.Fatalf("configured saturation ranking = %+v, %v", candidates, err)
 			}
@@ -117,16 +118,16 @@ func TestIndexConfiguresLengthNormalization(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			index := newIndex(t, bm25.WithSaturation(1), bm25.WithLengthNormalization(test.normalization))
-			for _, entry := range []memory.Entry{
-				{ID: "a-long", Content: "term filler filler filler", Version: 1},
-				{ID: "b-short", Content: "term filler", Version: 1},
+			for _, item := range []retrieval.Item{
+				{ID: "a-long", Text: "term filler filler filler", Version: 1},
+				{ID: "b-short", Text: "term filler", Version: 1},
 			} {
-				if err := index.Upsert(t.Context(), entry); err != nil {
+				if err := index.Upsert(t.Context(), item); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			candidates, err := index.Retrieve(t.Context(), memory.NewQuery("term"))
+			candidates, err := index.Retrieve(t.Context(), retrieval.NewQuery("term"))
 			if err != nil || len(candidates) != 2 || candidates[0].ID != test.firstID {
 				t.Fatalf("configured length normalization ranking = %+v, %v", candidates, err)
 			}
@@ -163,12 +164,10 @@ func TestNewRejectsInvalidScoringOptionsBeforeLoading(t *testing.T) {
 		{name: "negative infinite normalization", option: bm25.WithLengthNormalization(math.Inf(-1))},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			store := newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
-				t.Fatal("invalid scoring options caused a store read")
-
-				return memory.Page{}, nil
-			})
-			if index, err := bm25.New(t.Context(), store, test.option); index != nil || err == nil {
+			items := func(func(retrieval.Item, error) bool) {
+				t.Fatal("invalid scoring options caused item loading")
+			}
+			if index, err := bm25.New(items, test.option); index != nil || err == nil {
 				t.Fatalf("invalid scoring options: index=%v, error=%v", index, err)
 			}
 		})
@@ -181,32 +180,32 @@ func TestIndexFiltersScopesAndIDsBeforeLimiting(t *testing.T) {
 	ctx := t.Context()
 
 	index := newIndex(t)
-	for _, entry := range []memory.Entry{
-		{ID: "a", Scope: "workdir:/one/child", Content: "same", Version: 1},
-		{ID: "b", Scope: "workdir:/one", Content: "same", Version: 1},
-		{ID: "c", Scope: "workdir:/one", Content: "same", Version: 1},
+	for _, item := range []retrieval.Item{
+		{ID: "a", Scope: "workdir:/one/child", Text: "same", Version: 1},
+		{ID: "b", Scope: "workdir:/one", Text: "same", Version: 1},
+		{ID: "c", Scope: "workdir:/one", Text: "same", Version: 1},
 	} {
-		if err := index.Upsert(ctx, entry); err != nil {
+		if err := index.Upsert(ctx, item); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	candidates, err := index.Retrieve(ctx, memory.NewQuery("same", memory.WithScopes("workdir:/one"), memory.WithLimit(1)))
+	candidates, err := index.Retrieve(ctx, retrieval.NewQuery("same", retrieval.WithScopes("workdir:/one"), retrieval.WithLimit(1)))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "b" {
 		t.Fatalf("scoped result limit or tie order = %+v, %v", candidates, err)
 	}
 
-	candidates, err = index.Retrieve(ctx, memory.NewQuery("same", memory.WithScopes("workdir:/one"), memory.WithIDs("c")))
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("same", retrieval.WithScopes("workdir:/one"), retrieval.WithIDs("c")))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "c" {
 		t.Fatalf("ID filter = %+v, %v", candidates, err)
 	}
 
-	candidates, err = index.Retrieve(ctx, memory.NewQuery("", memory.WithLimit(1)))
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("", retrieval.WithLimit(1)))
 	if err != nil || len(candidates) != 0 {
 		t.Fatalf("empty query = %+v, %v", candidates, err)
 	}
 
-	if _, err := index.Retrieve(ctx, memory.NewQuery("same", memory.WithLimit(-1))); err == nil {
+	if _, err := index.Retrieve(ctx, retrieval.NewQuery("same", retrieval.WithLimit(-1))); err == nil {
 		t.Fatal("negative retrieval limit was accepted")
 	}
 }
@@ -217,23 +216,23 @@ func TestIndexReplacesEntriesAndRemovesIdempotently(t *testing.T) {
 	ctx := t.Context()
 
 	index := newIndex(t)
-	for _, entry := range []memory.Entry{
-		{ID: "note", Scope: "personal", Content: "original", Version: 1},
-		{ID: "note", Scope: "personal", Content: "original", Version: 1},
-		{ID: "other", Scope: "personal", Content: "original", Version: 1},
-		{ID: "note", Scope: "project", Content: "replacement", Version: 2},
+	for _, item := range []retrieval.Item{
+		{ID: "note", Scope: "personal", Text: "original", Version: 1},
+		{ID: "note", Scope: "personal", Text: "original", Version: 1},
+		{ID: "other", Scope: "personal", Text: "original", Version: 1},
+		{ID: "note", Scope: "project", Text: "replacement", Version: 2},
 	} {
-		if err := index.Upsert(ctx, entry); err != nil {
+		if err := index.Upsert(ctx, item); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	candidates, err := index.Retrieve(ctx, memory.NewQuery("original"))
+	candidates, err := index.Retrieve(ctx, retrieval.NewQuery("original"))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "other" {
 		t.Fatalf("replacement retained old terms: %+v, %v", candidates, err)
 	}
 
-	candidates, err = index.Retrieve(ctx, memory.NewQuery("replacement", memory.WithScopes("project")))
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("replacement", retrieval.WithScopes("project")))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "note" || candidates[0].Version != 2 {
 		t.Fatalf("replacement lost current data: %+v, %v", candidates, err)
 	}
@@ -248,7 +247,7 @@ func TestIndexReplacesEntriesAndRemovesIdempotently(t *testing.T) {
 		}
 	}
 
-	candidates, err = index.Retrieve(ctx, memory.NewQuery("original replacement"))
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("original replacement"))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "other" {
 		t.Fatalf("idempotent removal changed another entry: %+v, %v", candidates, err)
 	}
@@ -259,78 +258,84 @@ func TestIndexCanceledOperationsPreserveState(t *testing.T) {
 
 	index := newIndex(t)
 
-	entry := memory.Entry{ID: "note", Content: "original", Version: 1}
-	if err := index.Upsert(t.Context(), entry); err != nil {
+	item := retrieval.Item{ID: "note", Text: "original", Version: 1}
+	if err := index.Upsert(t.Context(), item); err != nil {
 		t.Fatal(err)
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	if err := index.Upsert(ctx, memory.Entry{ID: entry.ID, Content: "changed", Version: 2}); !errors.Is(err, context.Canceled) {
+	if err := index.Upsert(ctx, retrieval.Item{ID: item.ID, Text: "changed", Version: 2}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled upsert: %v", err)
 	}
 
-	if err := index.Remove(ctx, entry.ID); !errors.Is(err, context.Canceled) {
+	if err := index.Remove(ctx, item.ID); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled remove: %v", err)
 	}
 
-	if _, err := index.Retrieve(ctx, memory.NewQuery("original")); !errors.Is(err, context.Canceled) {
+	if _, err := index.Retrieve(ctx, retrieval.NewQuery("original")); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled retrieval: %v", err)
 	}
 
-	candidates, err := index.Retrieve(t.Context(), memory.NewQuery("original changed"))
+	candidates, err := index.Retrieve(t.Context(), retrieval.NewQuery("original changed"))
 	if err != nil || len(candidates) != 1 || candidates[0].Version != 1 {
 		t.Fatalf("canceled operations changed the index: %+v, %v", candidates, err)
 	}
 }
 
-func TestNewLoadsAllPages(t *testing.T) {
+func TestIndexIgnoresOlderVersions(t *testing.T) {
 	t.Parallel()
 
-	entries := []memory.Entry{
-		{ID: "a", Scope: "personal", Content: "stored", Version: 3},
-		{ID: "b", Scope: "project:demo", Content: "stored", Version: 2},
-		{ID: "c", Scope: "project:demo/child", Content: "stored", Version: 7},
-	}
-	pages := []memory.Page{
-		{Entries: entries[:2], NextID: "b"},
-		{Entries: entries[2:]},
-	}
-	cursors := []string{"", "b"}
-	calls := 0
-	store := newListStore(func(_ context.Context, filter memory.Filter) (memory.Page, error) {
-		if calls >= len(pages) {
-			t.Fatal("initialization read beyond the last page")
+	ctx := t.Context()
+
+	index := newIndex(t)
+	for _, item := range []retrieval.Item{
+		{ID: "note", Scope: "personal", Text: "current", Version: 3},
+		{ID: "note", Scope: "personal", Text: "outdated", Version: 2},
+	} {
+		if err := index.Upsert(ctx, item); err != nil {
+			t.Fatal(err)
 		}
+	}
 
-		if filter.AfterID != cursors[calls] || filter.Limit != memory.DefaultPageSize || len(filter.Scopes) != 0 || len(filter.IDs) != 0 {
-			t.Fatalf("initialization filter = %+v", filter)
-		}
+	candidates, err := index.Retrieve(ctx, retrieval.NewQuery("current"))
+	if err != nil || len(candidates) != 1 || candidates[0].Version != 3 {
+		t.Fatalf("older version replaced a newer one: %+v, %v", candidates, err)
+	}
 
-		page := pages[calls]
-		calls++
+	candidates, err = index.Retrieve(ctx, retrieval.NewQuery("outdated"))
+	if err != nil || len(candidates) != 0 {
+		t.Fatalf("older version was indexed: %+v, %v", candidates, err)
+	}
+}
 
-		return page, nil
-	})
+func TestNewIndexesAllItems(t *testing.T) {
+	t.Parallel()
 
-	index, err := bm25.New(t.Context(), store)
+	stored := []retrieval.Item{
+		{ID: "a", Scope: "personal", Text: "stored", Version: 3},
+		{ID: "b", Scope: "project:demo", Text: "stored", Version: 2},
+		{ID: "c", Scope: "project:demo/child", Text: "stored", Version: 7},
+	}
+
+	index, err := bm25.New(items(stored...))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	candidates, err := index.Retrieve(t.Context(), memory.NewQuery("stored"))
-	if err != nil || len(candidates) != len(entries) || calls != len(pages) {
-		t.Fatalf("initialized candidates = %+v, %v; pages=%d", candidates, err, calls)
+	candidates, err := index.Retrieve(t.Context(), retrieval.NewQuery("stored"))
+	if err != nil || len(candidates) != len(stored) {
+		t.Fatalf("initialized candidates = %+v, %v", candidates, err)
 	}
 
 	for position, candidate := range candidates {
-		if candidate.ID != entries[position].ID || candidate.Version != entries[position].Version {
-			t.Fatalf("initialized candidate = %+v, want %+v", candidate, entries[position])
+		if candidate.ID != stored[position].ID || candidate.Version != stored[position].Version {
+			t.Fatalf("initialized candidate = %+v, want %+v", candidate, stored[position])
 		}
 	}
 
-	candidates, err = index.Retrieve(t.Context(), memory.NewQuery("stored", memory.WithScopes("project:demo")))
+	candidates, err = index.Retrieve(t.Context(), retrieval.NewQuery("stored", retrieval.WithScopes("project:demo")))
 	if err != nil || len(candidates) != 1 || candidates[0].ID != "b" {
 		t.Fatalf("initialized scopes = %+v, %v", candidates, err)
 	}
@@ -340,88 +345,36 @@ func TestNewDoesNotReturnPartialIndexOnFailure(t *testing.T) {
 	t.Parallel()
 
 	failure := errors.New("store unavailable")
-
-	store := newListStore(func(_ context.Context, filter memory.Filter) (memory.Page, error) {
-		if filter.AfterID == "" {
-			return memory.Page{
-				Entries: []memory.Entry{{ID: "first", Content: "stored", Version: 1}},
-				NextID:  "first",
-			}, nil
+	failing := func(yield func(retrieval.Item, error) bool) {
+		if yield(retrieval.Item{ID: "first", Text: "stored", Version: 1}, nil) {
+			yield(retrieval.Item{}, failure)
 		}
+	}
 
-		return memory.Page{}, failure
-	})
-	if index, err := bm25.New(t.Context(), store); index != nil || !errors.Is(err, failure) {
+	if index, err := bm25.New(failing); index != nil || !errors.Is(err, failure) {
 		t.Fatalf("failed initialization = %v, %v", index, err)
 	}
 
-	store = newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
-		return memory.Page{Entries: []memory.Entry{
-			{ID: "first", Content: "stored", Version: 1},
-			{ID: "invalid", Content: "stored"},
-		}}, nil
-	})
-	if index, err := bm25.New(t.Context(), store); index != nil || err == nil {
-		t.Fatalf("invalid entry initialization = %v, %v", index, err)
+	invalid := items(retrieval.Item{ID: "first", Text: "stored", Version: 1}, retrieval.Item{ID: "invalid", Text: "stored"})
+	if index, err := bm25.New(invalid); index != nil || err == nil {
+		t.Fatalf("invalid item initialization = %v, %v", index, err)
 	}
 }
 
-func TestNewHonorsCancellation(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-
-	store := newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
-		t.Fatal("canceled initialization read the store")
-
-		return memory.Page{}, nil
-	})
-	if index, err := bm25.New(ctx, store); index != nil || !errors.Is(err, context.Canceled) {
-		t.Fatalf("canceled initialization = %v, %v", index, err)
-	}
-
-	ctx, cancel = context.WithCancel(t.Context())
-	defer cancel()
-
-	store = newListStore(func(_ context.Context, filter memory.Filter) (memory.Page, error) {
-		if filter.AfterID == "" {
-			return memory.Page{
-				Entries: []memory.Entry{{ID: "first", Content: "stored", Version: 1}},
-				NextID:  "first",
-			}, nil
+func items(values ...retrieval.Item) iter.Seq2[retrieval.Item, error] {
+	return func(yield func(retrieval.Item, error) bool) {
+		for _, item := range values {
+			if !yield(item, nil) {
+				return
+			}
 		}
-
-		cancel()
-
-		return memory.Page{Entries: []memory.Entry{{ID: "second", Content: "stored", Version: 1}}}, nil
-	})
-	if index, err := bm25.New(ctx, store); index != nil || !errors.Is(err, context.Canceled) {
-		t.Fatalf("initialization canceled between pages = %v, %v", index, err)
 	}
-}
-
-type listStore struct {
-	memory.Store
-	list func(context.Context, memory.Filter) (memory.Page, error)
-}
-
-func newListStore(list func(context.Context, memory.Filter) (memory.Page, error)) *listStore {
-	return &listStore{list: list}
-}
-
-func (s *listStore) List(ctx context.Context, filter memory.Filter) (memory.Page, error) {
-	return s.list(ctx, filter)
 }
 
 func newIndex(t *testing.T, options ...bm25.Option) *bm25.Index {
 	t.Helper()
 
-	store := newListStore(func(context.Context, memory.Filter) (memory.Page, error) {
-		return memory.Page{}, nil
-	})
-
-	index, err := bm25.New(t.Context(), store, options...)
+	index, err := bm25.New(items(), options...)
 	if err != nil {
 		t.Fatal(err)
 	}

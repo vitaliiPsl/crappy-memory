@@ -9,7 +9,7 @@ import (
 
 	"github.com/vitaliipsl/crappy-memory/index/bm25"
 	"github.com/vitaliipsl/crappy-memory/memory"
-	"github.com/vitaliipsl/crappy-memory/pipeline"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 )
 
 func TestConsumerWorkflow(t *testing.T) {
@@ -45,12 +45,7 @@ func TestConsumerRecoversAfterIndexFailures(t *testing.T) {
 
 			t.Cleanup(func() { _ = closeStore() })
 
-			index, err := bm25.New(t.Context(), store)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			search, err := pipeline.New(store, pipeline.WithRetrievers(index))
+			index, err := bm25.New(memory.Items(t.Context(), store))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -59,7 +54,7 @@ func TestConsumerRecoversAfterIndexFailures(t *testing.T) {
 
 			memories := memory.New(store,
 				memory.WithIndexer(newUnavailableIndexer(), func(_ context.Context, err error) { failures = append(failures, err) }),
-				memory.WithPipeline(search),
+				memory.WithRetriever(index),
 			)
 
 			created, err := memories.Create(t.Context(), "personal", "Use Go table-driven tests.")
@@ -67,7 +62,7 @@ func TestConsumerRecoversAfterIndexFailures(t *testing.T) {
 				t.Fatalf("canonical write: entry=%+v, error=%v, indexing failures=%v", created, err, failures)
 			}
 
-			if err := index.Upsert(t.Context(), created); err != nil {
+			if err := index.Upsert(t.Context(), retrieval.Item{ID: created.ID, Scope: created.Scope, Version: created.Version, Text: created.Content}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -109,7 +104,7 @@ func newUnavailableIndexer() *unavailableIndexer {
 	return &unavailableIndexer{}
 }
 
-func (*unavailableIndexer) Upsert(context.Context, memory.Entry) error {
+func (*unavailableIndexer) Upsert(context.Context, retrieval.Item) error {
 	return errors.New("index unavailable")
 }
 

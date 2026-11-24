@@ -2,7 +2,6 @@ package inmemory_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"math"
 	"slices"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/vitaliipsl/crappy-memory/index/vector"
 	"github.com/vitaliipsl/crappy-memory/index/vector/storage/inmemory"
-	"github.com/vitaliipsl/crappy-memory/memory"
 )
 
 func TestStoreRanksCosineSimilarityWithFilters(t *testing.T) {
@@ -47,14 +45,18 @@ func TestStoreRanksCosineSimilarityWithFilters(t *testing.T) {
 		t.Fatalf("ID filter before limit = %+v, %v", candidates, err)
 	}
 
-	page, err := store.List(ctx, memory.Filter{Limit: 2})
+	page, err := store.List(ctx, "", 2)
 	if err != nil || len(page.Records) != 2 || page.Records[0].ID != "a" || page.Records[1].ID != "b" || page.NextID != "b" {
 		t.Fatalf("first record page = %+v, %v", page, err)
 	}
 
-	page, err = store.List(ctx, memory.Filter{AfterID: page.NextID, Scopes: []string{"one"}, IDs: []string{"c", "d"}, Limit: 2})
-	if err != nil || len(page.Records) != 1 || page.Records[0].ID != "c" || page.NextID != "" {
-		t.Fatalf("filtered record page = %+v, %v", page, err)
+	page, err = store.List(ctx, page.NextID, 2)
+	if err != nil || len(page.Records) != 2 || page.Records[0].ID != "c" || page.Records[1].ID != "d" || page.NextID != "" {
+		t.Fatalf("last record page = %+v, %v", page, err)
+	}
+
+	if _, err := store.List(ctx, "", 0); err == nil {
+		t.Fatal("non-positive list limit accepted")
 	}
 }
 
@@ -218,7 +220,7 @@ func TestStoreReplacesRecordsAndRemovesIdempotently(t *testing.T) {
 		t.Fatalf("removed record was retained: %v", err)
 	}
 
-	page, err := store.List(ctx, memory.Filter{})
+	page, err := store.List(ctx, "", 10)
 	if err != nil || len(page.Records) != 1 || page.Records[0].ID != "other" {
 		t.Fatalf("idempotent removal changed another record: %+v, %v", page, err)
 	}
@@ -272,19 +274,11 @@ func TestStoreOwnsRecordData(t *testing.T) {
 	store := inmemory.New()
 
 	values := []float32{1, 0}
-
-	metadata := map[string]json.RawMessage{
-		"model":    json.RawMessage(`"embedding-model"`),
-		"provider": json.RawMessage(`{"name":"provider"}`),
-	}
-	if err := store.Upsert(ctx, []vector.Record{{ID: "note", Version: 1, Space: "test-space", Values: values, Metadata: metadata}}); err != nil {
+	if err := store.Upsert(ctx, []vector.Record{{ID: "note", Version: 1, Space: "test-space", Values: values}}); err != nil {
 		t.Fatal(err)
 	}
 
 	values[0] = 0
-	metadata["model"][1] = 'x'
-	metadata["extra"] = json.RawMessage(`true`)
-	delete(metadata, "provider")
 
 	for range 2 {
 		record, err := store.Get(ctx, "note")
@@ -292,30 +286,15 @@ func TestStoreOwnsRecordData(t *testing.T) {
 			t.Fatalf("stored vector was mutated: %+v, %v", record, err)
 		}
 
-		if len(record.Metadata) != 2 || string(record.Metadata["model"]) != `"embedding-model"` || string(record.Metadata["provider"]) != `{"name":"provider"}` {
-			t.Fatalf("stored metadata was mutated: %+v", record.Metadata)
-		}
-
 		record.Values[0] = 0
-		record.Metadata["model"][1] = 'x'
-		record.Metadata["extra"] = json.RawMessage(`true`)
-		delete(record.Metadata, "provider")
 	}
 
-	page, err := store.List(ctx, memory.Filter{})
+	page, err := store.List(ctx, "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	page.Records[0].Values[0] = 0
-	page.Records[0].Metadata["model"][1] = 'x'
-	page.Records[0].Metadata["extra"] = json.RawMessage(`true`)
-	delete(page.Records[0].Metadata, "provider")
-
-	record, err := store.Get(ctx, "note")
-	if err != nil || len(record.Metadata) != 2 || string(record.Metadata["model"]) != `"embedding-model"` || string(record.Metadata["provider"]) != `{"name":"provider"}` {
-		t.Fatalf("list output mutation changed stored metadata: %+v, %v", record, err)
-	}
 
 	candidates, err := store.Search(ctx, vector.Query{Space: "test-space", Values: []float32{1, 0}})
 	if err != nil || len(candidates) != 1 || candidates[0].Score != 1 {
@@ -381,7 +360,7 @@ func TestStoreHonorsCancellation(t *testing.T) {
 		t.Fatalf("canceled get = %v", err)
 	}
 
-	if _, err := store.List(ctx, memory.Filter{}); !errors.Is(err, context.Canceled) {
+	if _, err := store.List(ctx, "", 10); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled list = %v", err)
 	}
 

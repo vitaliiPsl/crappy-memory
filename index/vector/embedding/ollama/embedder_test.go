@@ -66,7 +66,7 @@ func TestEmbedderFormatsQueriesAndDocuments(t *testing.T) {
 			texts := []string{"saved fact", "another fact"}
 
 			documents, err := embedder.EmbedDocuments(t.Context(), texts)
-			if err != nil || len(documents) != 2 || !slices.Equal(documents[0].Values, []float32{1, 1}) || !slices.Equal(documents[1].Values, []float32{2, 1}) {
+			if err != nil || len(documents) != 2 || !slices.Equal(documents[0], []float32{1, 1}) || !slices.Equal(documents[1], []float32{2, 1}) {
 				t.Fatalf("document embeddings = %+v, %v", documents, err)
 			}
 
@@ -79,23 +79,12 @@ func TestEmbedderFormatsQueriesAndDocuments(t *testing.T) {
 			}
 
 			query, err := embedder.EmbedQuery(t.Context(), "a question")
-			if err != nil || !slices.Equal(query.Values, []float32{1, 1}) {
+			if err != nil || !slices.Equal(query, []float32{1, 1}) {
 				t.Fatalf("query embedding = %+v, %v", query, err)
 			}
 
 			if got := <-inputs; !slices.Equal(got, []string{test.queryPrefix + "a question"}) {
 				t.Fatalf("query input = %v", got)
-			}
-
-			for _, metadata := range []map[string]json.RawMessage{documents[0].Metadata, documents[1].Metadata, query.Metadata} {
-				if string(metadata["provider"]) != `"ollama"` || string(metadata["model"]) != `"local:latest"` || len(metadata) != 2 {
-					t.Fatalf("embedding provenance = %v", metadata)
-				}
-			}
-
-			documents[0].Metadata["model"][1] = 'x'
-			if string(documents[1].Metadata["model"]) != `"local:latest"` {
-				t.Fatal("embeddings share mutable metadata")
 			}
 
 			empty, err := embedder.EmbedDocuments(t.Context(), nil)
@@ -179,7 +168,6 @@ func TestEmbedderPropagatesInvalidResponses(t *testing.T) {
 		{name: "non-JSON error", status: http.StatusBadGateway, body: "bad gateway", wantError: "502"},
 		{name: "invalid JSON", status: http.StatusOK, body: `{`, wantError: "decode"},
 		{name: "missing embedding", status: http.StatusOK, body: `{"model":"local:latest","embeddings":[]}`, wantError: "embeddings"},
-		{name: "missing model", status: http.StatusOK, body: `{"embeddings":[[1,0]]}`, wantError: "model"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			server := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
@@ -192,7 +180,7 @@ func TestEmbedderPropagatesInvalidResponses(t *testing.T) {
 			embedder := newEmbedder(t, server)
 
 			query, err := embedder.EmbedQuery(t.Context(), "question")
-			if err == nil || !strings.Contains(err.Error(), test.wantError) || query.Values != nil {
+			if err == nil || !strings.Contains(err.Error(), test.wantError) || query != nil {
 				t.Fatalf("invalid query response = %+v, %v", query, err)
 			}
 

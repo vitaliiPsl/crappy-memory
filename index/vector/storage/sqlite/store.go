@@ -5,52 +5,54 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/vitaliipsl/crappy-memory/index/vector"
-	"github.com/vitaliipsl/crappy-memory/memory"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 )
 
 var _ vector.Store = (*Store)(nil)
 
+const DefaultTable = "vectors"
+
 const schema = `
-CREATE TABLE IF NOT EXISTS vectors (
+CREATE TABLE IF NOT EXISTS "%[1]s" (
 	id TEXT PRIMARY KEY,
 	scope TEXT NOT NULL,
 	version TEXT NOT NULL,
 	space TEXT NOT NULL,
-	embedding BLOB NOT NULL,
-	metadata BLOB NOT NULL
+	embedding BLOB NOT NULL
 ) STRICT;
-CREATE INDEX IF NOT EXISTS vectors_space_scope ON vectors(space, scope);
+CREATE INDEX IF NOT EXISTS "%[1]s_space_scope" ON "%[1]s"(space, scope);
 `
 
 const (
-	columns = "id, scope, version, space, embedding, metadata"
+	columns = "id, scope, version, space, embedding"
 
-	getQuery    = "SELECT " + columns + " FROM vectors WHERE id = ?"
-	listQuery   = "SELECT " + columns + " FROM vectors WHERE id > ?%s ORDER BY id"
-	searchQuery = "SELECT " + columns + " FROM vectors WHERE space = ?%s"
+	getQuery    = `SELECT ` + columns + ` FROM "%s" WHERE id = ?`
+	listQuery   = `SELECT ` + columns + ` FROM "%s" WHERE id > ? ORDER BY id`
+	searchQuery = `SELECT ` + columns + ` FROM "%s" WHERE space = ?%s`
 
 	upsertQuery = `
-INSERT INTO vectors (id, scope, version, space, embedding, metadata)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO "%s" (id, scope, version, space, embedding)
+VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
 	scope = excluded.scope,
 	version = excluded.version,
 	space = excluded.space,
-	embedding = excluded.embedding,
-	metadata = excluded.metadata
+	embedding = excluded.embedding
 `
 
-	removeQuery = "DELETE FROM vectors WHERE id = ?"
+	removeQuery = `DELETE FROM "%s" WHERE id = ?`
 )
+
+var tableName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 type Option func(*Store)
 
@@ -60,26 +62,37 @@ func WithSimilarity(similarity vector.Similarity) Option {
 	}
 }
 
+func WithTable(table string) Option {
+	return func(store *Store) {
+		store.table = table
+	}
+}
+
 type Store struct {
 	db         *sql.DB
+	table      string
 	similarity vector.Similarity
 }
 
 func New(db *sql.DB, options ...Option) (*Store, error) {
-	if _, err := db.Exec(schema); err != nil {
-		return nil, fmt.Errorf("initialize vector database: %w", err)
-	}
-
-	store := &Store{db: db, similarity: vector.Cosine}
+	store := &Store{db: db, table: DefaultTable, similarity: vector.Cosine}
 	for _, option := range options {
 		option(store)
+	}
+
+	if !tableName.MatchString(store.table) {
+		return nil, fmt.Errorf("vector table name must be a plain SQL identifier: %q", store.table)
+	}
+
+	if _, err := db.Exec(fmt.Sprintf(schema, store.table)); err != nil {
+		return nil, fmt.Errorf("initialize vector database: %w", err)
 	}
 
 	return store, nil
 }
 
 func (s *Store) Get(ctx context.Context, id string) (vector.Record, error) {
-	row := s.db.QueryRowContext(ctx, getQuery, id)
+	row := s.db.QueryRowContext(ctx, fmt.Sprintf(getQuery, s.table), id)
 
 	record, err := scanRecord(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -93,20 +106,12 @@ func (s *Store) Get(ctx context.Context, id string) (vector.Record, error) {
 	return record, nil
 }
 
-func (s *Store) List(ctx context.Context, filter memory.Filter) (vector.Page, error) {
-	if filter.Limit < 0 {
-		return vector.Page{}, errors.New("vector list limit cannot be negative")
+func (s *Store) List(ctx context.Context, afterID string, limit int) (vector.Page, error) {
+	if limit <= 0 {
+		return vector.Page{}, errors.New("vector list limit must be positive")
 	}
 
-	limit := filter.Limit
-	if limit == 0 {
-		limit = memory.DefaultPageSize
-	}
-
-	where, arguments := filters(filter.Scopes, filter.IDs)
-	arguments = append([]any{filter.AfterID}, arguments...)
-
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(listQuery, where), arguments...)
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(listQuery, s.table), afterID)
 	if err != nil {
 		return vector.Page{}, fmt.Errorf("list vectors: %w", err)
 	}
@@ -144,7 +149,7 @@ func (s *Store) Upsert(ctx context.Context, records []vector.Record) error {
 
 	defer func() { _ = tx.Rollback() }()
 
-	statement, err := tx.PrepareContext(ctx, upsertQuery)
+	statement, err := tx.PrepareContext(ctx, fmt.Sprintf(upsertQuery, s.table))
 	if err != nil {
 		return fmt.Errorf("prepare vector upsert: %w", err)
 	}
@@ -164,12 +169,7 @@ func (s *Store) Upsert(ctx context.Context, records []vector.Record) error {
 			return fmt.Errorf("vector %q: %w", record.ID, err)
 		}
 
-		metadata, err := json.Marshal(record.Metadata)
-		if err != nil {
-			return fmt.Errorf("encode vector %q metadata: %w", record.ID, err)
-		}
-
-		if _, err := statement.ExecContext(ctx, record.ID, record.Scope, strconv.FormatUint(record.Version, 10), record.Space, encodeVector(record.Values), metadata); err != nil {
+		if _, err := statement.ExecContext(ctx, record.ID, record.Scope, strconv.FormatUint(record.Version, 10), record.Space, encodeVector(record.Values)); err != nil {
 			return fmt.Errorf("upsert vector %q: %w", record.ID, err)
 		}
 	}
@@ -186,14 +186,14 @@ func (s *Store) Remove(ctx context.Context, id string) error {
 		return errors.New("removed vector ID is required")
 	}
 
-	if _, err := s.db.ExecContext(ctx, removeQuery, id); err != nil {
+	if _, err := s.db.ExecContext(ctx, fmt.Sprintf(removeQuery, s.table), id); err != nil {
 		return fmt.Errorf("remove vector %q: %w", id, err)
 	}
 
 	return nil
 }
 
-func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candidate, error) {
+func (s *Store) Search(ctx context.Context, query vector.Query) ([]retrieval.Candidate, error) {
 	if strings.TrimSpace(query.Space) == "" {
 		return nil, errors.New("query space is required")
 	}
@@ -208,20 +208,20 @@ func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candid
 
 	limit := query.Limit
 	if limit == 0 {
-		limit = memory.DefaultSearchLimit
+		limit = retrieval.DefaultSearchLimit
 	}
 
 	where, arguments := filters(query.Scopes, query.IDs)
 	arguments = append([]any{query.Space}, arguments...)
 
-	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(searchQuery, where), arguments...)
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(searchQuery, s.table, where), arguments...)
 	if err != nil {
 		return nil, fmt.Errorf("search vectors: %w", err)
 	}
 
 	defer func() { _ = rows.Close() }()
 
-	candidates := make([]memory.Candidate, 0)
+	candidates := make([]retrieval.Candidate, 0)
 	for rows.Next() {
 		record, err := scanRecord(rows)
 		if err != nil {
@@ -237,14 +237,14 @@ func (s *Store) Search(ctx context.Context, query vector.Query) ([]memory.Candid
 			return nil, fmt.Errorf("vector %q similarity score must be finite", record.ID)
 		}
 
-		candidates = append(candidates, memory.Candidate{ID: record.ID, Version: record.Version, Score: score})
+		candidates = append(candidates, retrieval.Candidate{ID: record.ID, Version: record.Version, Score: score})
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("search vectors: %w", err)
 	}
 
-	slices.SortFunc(candidates, func(a, b memory.Candidate) int {
+	slices.SortFunc(candidates, func(a, b retrieval.Candidate) int {
 		if order := cmp.Compare(b.Score, a.Score); order != 0 {
 			return order
 		}
@@ -280,11 +280,11 @@ func filters(scopes, ids []string) (string, []any) {
 
 func scanRecord(row interface{ Scan(...any) error }) (vector.Record, error) {
 	var (
-		record           vector.Record
-		values, metadata []byte
+		record vector.Record
+		values []byte
 	)
 
-	if err := row.Scan(&record.ID, &record.Scope, &record.Version, &record.Space, &values, &metadata); err != nil {
+	if err := row.Scan(&record.ID, &record.Scope, &record.Version, &record.Space, &values); err != nil {
 		return vector.Record{}, err
 	}
 
@@ -299,10 +299,6 @@ func scanRecord(row interface{ Scan(...any) error }) (vector.Record, error) {
 
 	if err := validateVector(record.Values); err != nil {
 		return vector.Record{}, err
-	}
-
-	if err := json.Unmarshal(metadata, &record.Metadata); err != nil {
-		return vector.Record{}, fmt.Errorf("decode vector metadata: %w", err)
 	}
 
 	return record, nil

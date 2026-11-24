@@ -15,7 +15,7 @@ import (
 
 	"github.com/vitaliipsl/crappy-memory/index/bm25"
 	"github.com/vitaliipsl/crappy-memory/memory"
-	"github.com/vitaliipsl/crappy-memory/pipeline"
+	"github.com/vitaliipsl/crappy-memory/retrieval"
 	jsonstore "github.com/vitaliipsl/crappy-memory/storage/json"
 	sqlitestore "github.com/vitaliipsl/crappy-memory/storage/sqlite"
 )
@@ -91,7 +91,7 @@ func recallAndForget(ctx context.Context, backend, directory string, entry memor
 		return err
 	}
 
-	results, err := memories.Search(ctx, "Go tests", memory.WithScopes("personal"), memory.WithLimit(3))
+	results, err := memories.Search(ctx, "Go tests", retrieval.WithScopes("personal"), retrieval.WithLimit(3))
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func recallAndForget(ctx context.Context, backend, directory string, entry memor
 		return fmt.Errorf("deleted entry: expected ErrNotFound, got %v", err)
 	}
 
-	results, err = memories.Search(ctx, "Go tests", memory.WithScopes("personal"))
+	results, err = memories.Search(ctx, "Go tests", retrieval.WithScopes("personal"))
 	if err != nil {
 		return err
 	}
@@ -127,19 +127,14 @@ func recallAndForget(ctx context.Context, backend, directory string, entry memor
 }
 
 func openMemory(ctx context.Context, store memory.Store) (*memory.Memory, error) {
-	index, err := bm25.New(ctx, store)
-	if err != nil {
-		return nil, err
-	}
-
-	search, err := pipeline.New(store, pipeline.WithRetrievers(index))
+	index, err := bm25.New(memory.Items(ctx, store))
 	if err != nil {
 		return nil, err
 	}
 
 	return memory.New(store,
 		memory.WithIndexer(index, func(_ context.Context, err error) { log.Printf("indexing: %v", err) }),
-		memory.WithPipeline(search),
+		memory.WithRetriever(index),
 	), nil
 }
 
