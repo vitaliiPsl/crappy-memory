@@ -82,10 +82,6 @@ func (m *Memory) Create(ctx context.Context, scope, content string, options ...E
 	return entry, nil
 }
 
-func (m *Memory) Get(ctx context.Context, id string) (Entry, error) {
-	return m.store.Get(ctx, id)
-}
-
 func (m *Memory) Update(ctx context.Context, id string, expectedVersion uint64, content string, options ...EntryOption) (Entry, error) {
 	if strings.TrimSpace(content) == "" {
 		return Entry{}, errors.New("memory content is required")
@@ -128,6 +124,10 @@ func (m *Memory) Delete(ctx context.Context, id string, expectedVersion uint64) 
 	return err
 }
 
+func (m *Memory) Get(ctx context.Context, id string) (Entry, error) {
+	return m.store.Get(ctx, id)
+}
+
 func (m *Memory) List(ctx context.Context, filter Filter) (Page, error) {
 	return m.store.List(ctx, filter)
 }
@@ -161,7 +161,10 @@ func (m *Memory) Search(ctx context.Context, text string, options ...retrieval.Q
 		}
 
 		delete(entries, candidate.ID)
-		results = append(results, SearchResult{Entry: entry, Score: candidate.Score})
+		results = append(results, SearchResult{
+			Entry: entry,
+			Score: candidate.Score,
+		})
 	}
 
 	return results, nil

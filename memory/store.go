@@ -24,7 +24,10 @@ type Store interface {
 
 func Items(ctx context.Context, store Store) iter.Seq2[retrieval.Item, error] {
 	return func(yield func(retrieval.Item, error) bool) {
-		filter := Filter{Limit: DefaultPageSize}
+		filter := Filter{
+			Limit: DefaultPageSize,
+		}
+
 		for {
 			page, err := store.List(ctx, filter)
 			if err != nil {
@@ -49,5 +52,10 @@ func Items(ctx context.Context, store Store) iter.Seq2[retrieval.Item, error] {
 }
 
 func item(entry Entry) retrieval.Item {
-	return retrieval.Item{ID: entry.ID, Scope: entry.Scope, Version: entry.Version, Text: entry.Content}
+	return retrieval.Item{
+		ID: entry.ID,
+		Scope: entry.Scope,
+		Version: entry.Version,
+		Text: entry.Content,
+	}
 }

@@ -21,6 +21,7 @@ Agents forget everything when a session ends. This library gives them durable me
 - [Storage](#storage)
 - [Search](#search)
 - [Vector search](#vector-search)
+- [Sources](#sources)
 - [Consistency](#consistency)
 - [Extending](#extending)
 - [Examples](#examples)
@@ -151,11 +152,37 @@ Vectors live in memory (`index/vector/storage/inmemory`) or in a SQLite table (`
 
 `vector.New` reconciles before returning. It drops vectors of items it wasn't given, embeds items that are new, changed, or from another embedding space, and fails if any embedding fails. The Ollama space comes from the model name and prefixes, so changing them re-embeds everything. Truncation is off, so text longer than the model's context fails to embed.
 
+## Sources
+
+Sources keep documents as received and search them by passage. `Put` replaces a whole document: it chunks the content, stores the document and its chunks in one transaction, then indexes only the passages that changed. Putting unchanged content again writes nothing.
+
+```go
+store, err := sourcesqlite.New(db)
+keywords, err := bm25.New(source.Items(ctx, store))
+chunker, err := recursive.New()
+
+sources, err := source.New(ctx, store,
+    source.WithChunker("text/markdown", chunker),
+    source.WithIndexer(keywords, onIndexError),
+    source.WithRetriever(keywords),
+)
+
+_, err = sources.Put(ctx, "docs/setup.md", "project:website", "text/markdown", content)
+
+results, err := sources.Search(ctx, "how do I install it", retrieval.WithScopes("project:website"))
+// results[0].Chunk.Location: "lines 1-5"
+```
+
+A chunk's ID comes from its document, scope, and text, so an unchanged passage keeps its ID and index entries when the text around it changes, and a stale index can't return an edited passage. The recursive chunker works on any text: it splits at paragraph breaks, then lines, sentences, and words, and packs the pieces up to 2,000 characters. Text that only grows at the end, such as a conversation, keeps its earlier passages.
+
+The SQLite store keeps `documents` and `chunks` tables and can share a database with entries; give chunk vectors their own table with `WithTable`. `source.New` re-chunks documents whose chunker changed since they were put.
+
 ## Consistency
 
-- `Memory` writes to the store first, then updates every index. Index failures go to the indexer's handler and never fail the write; a missed update heals on the entry's next write or the next rebuild.
-- Build indexes before constructing `Memory`, while nothing writes to the store.
+- `Memory` and `Sources` write to the store first, then update every index. Index failures go to the indexer's handler and never fail the write; a missed update heals on the entry's next write or the next rebuild.
+- Build indexes before constructing `Memory` or `Sources`, while nothing writes to the store.
 - Indexes ignore updates older than the version they hold, so concurrent writes to one entry can't leave an old version indexed.
+- `Sources` serializes its writes, so use one `Sources` per store.
 - Databases, embedders, and HTTP clients you pass in stay yours to configure and close.
 
 ## Extending
@@ -163,6 +190,8 @@ Vectors live in memory (`index/vector/storage/inmemory`) or in a SQLite table (`
 Everything is an interface. If something doesn't fit, replace it.
 
 - **Store** — `memory.Store`
+- **Source store** — `source.Store`
+- **Chunker** — `source.Chunker`
 - **Indexer** — `retrieval.Indexer`
 - **Retriever** — `retrieval.Retriever`, returning candidate IDs with their indexed version, or 0 if unknown
 - **Merger** — `retrieval.Merger`
@@ -177,6 +206,7 @@ Everything is an interface. If something doesn't fit, replace it.
 | [Basic memory](examples/01-basic) | Entry lifecycle, source and metadata, scoped listing, and BM25 recall |
 | [SQLite](examples/02-sqlite) | Caller-owned database, persistence across reopening, scoped reads, and deletion |
 | [Hybrid search](examples/03-hybrid) | Ollama embeddings, keyword and vector indexes, and RRF merging |
+| [Sources](examples/04-sources) | Documents in SQLite, passage search with locations, replacement, and deletion |
 
 Examples use temporary storage. Hybrid search requires local Ollama with `qwen3-embedding:0.6b` installed.
 
@@ -184,6 +214,7 @@ Examples use temporary storage. Hybrid search requires local Ollama with `qwen3-
 go run ./examples/01-basic
 go run ./examples/02-sqlite
 go run ./examples/03-hybrid
+go run ./examples/04-sources
 ```
 
 ## Validation

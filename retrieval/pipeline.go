@@ -39,7 +39,9 @@ type Pipeline struct {
 }
 
 func NewPipeline(options ...PipelineOption) (*Pipeline, error) {
-	pipeline := &Pipeline{candidateLimit: DefaultCandidateLimit}
+	pipeline := &Pipeline{
+		candidateLimit: DefaultCandidateLimit,
+	}
 	for _, option := range options {
 		option(pipeline)
 	}
